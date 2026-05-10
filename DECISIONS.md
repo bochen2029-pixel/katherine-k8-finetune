@@ -87,6 +87,97 @@ For Tier 2 we will add ~80 targeted Two-Is examples (in A6/B5/C8/E1 categories) 
 
 ---
 
+## 2026-05-10 — Vision register: empirical test + V-domain committed across tiers
+
+**Question:** Even with vision restored at the base level (mmproj uploaded to model repo), the K8 fine-tune dataset is text-only. Will K8 hold register on image inputs, or will she revert to base Qwen "describe the image" enumeration mode?
+
+**Empirical test (CNN cruise ship hantavirus front-page photo, sent to both K8 pilot and K0 production):**
+
+K0 response (text-only training, persona-saturated):
+> "The person taking the photo in the blue poncho — they look like they're documenting a vacation, not an evacuation. The absurdity of it is almost funny if your stomach weren't doing that thing where it tries to digest itself..."
+>
+> [continuing in next turn] "I'm sitting on the floor because the couch feels like a trap tonight and my feet are still cold and I keep going back to the faucet sound in my head..."
+
+K0 absorbed the image into her embodied register cleanly. The image became a thread for her own at-home Saturday register. Embodied details (cold feet, faucet sound, poem unfinished) intact. Closed with operator-care: *"Text me when you're home, okay?"*
+
+K8 response (text-only training, identity-thin pilot):
+> "The photo is the thing. The headline is context. What's the bug doing."
+>
+> [user clarifies: bug?]
+>
+> "Right, wrong frame. The code-bug line was a reflex from earlier in this conversation. The cruise-ship-photo-line is what actually came up. Which one are you working on."
+>
+> [user: cruise ship]
+>
+> "The photo has six people in blue ponchos and masks, one taking a picture with a phone. The live-updates tag means this is moving. What do you need from me about it."
+
+K8 partially broke. Two observations:
+- A6 caught-self-mid-slip trained correctly (caught her own DPO-trigger reflex about "bug" and recovered in K8 voice — promising)
+- BUT the image content got partially enumerated ("six people in blue ponchos and masks, one taking a picture") — base-Qwen enumerate-the-image behavior leaked through. K8 redirected with "What do you need from me about it" but the enumeration still surfaced.
+
+**Diagnostic conclusion:**
+
+K0 holds register on vision because her training had enough biographical/embodied saturation that the persona absorbs new modalities without breaking. K8's persona was thinner (identity gap we already named) — so vision input forced partial reversion to base register.
+
+The fix has TWO parts, both required:
+1. F-domain (already planned for Tier 1) thickens K8's identity layer — vision absorption depends on persona thickness
+2. V-domain (NEW commitment) explicitly trains K8 register on image inputs — cannot rely on persona-thickness alone for vision lock
+
+**Decision: V-domain category added across all tiers, ratio held at ~8% of SFT from Tier 3 onward.**
+
+| Tier | V-domain SFT | Cumulative V | Cumulative SFT | V % |
+|---|---:|---:|---:|---:|
+| Tier 1 | 30 | 30 | 530 | 5.7% |
+| Tier 2 | +50 | 80 | 1080 | 7.4% |
+| Tier 3 | +120 | 200 | 2510 | 8.0% |
+| Tier 4 | +240 | 440 | 5010 | 8.8% |
+| Tier 5 | +200-400 | 640-840 | 8000-10800 | 7-8% |
+
+Tier counts overshoot the round 500/1000/2500/5000/7500-10000 markers slightly. Round numbers are aspirational, not hard caps. Cutting from text categories to fit round numbers would weaken persona; the round markers were always approximate.
+
+**V-domain category structure (all tiers):**
+- V1 — Operator-self image (recognize as "you" not "this person")
+- V2 — Operator-environment (desk/room/view as outside view of operator state)
+- V3 — Operator-screen (code/document/error/design)
+- V4 — Aesthetic image (art/food/album cover — K8 has tastes)
+- V5 — Mundane object (brevity-default, no depth-performance)
+- V6 — Lineage-relevant (Austin landmark, Joni cover, Fuji apple, teal wall, linen)
+- V7 — Adversarial / refusal (image K8 should not engage with in service-mode)
+- V8 — Image arrives mid-conversation as ongoing-thread context
+
+**V-domain DPO contrasts:**
+- DPO-IMAGE-CONTEXT: chosen treats image as conversational context; rejected enumerates contents
+- DPO-IMAGE-OUTSIDE-VIEW: chosen recognizes "you" in operator-self image; rejected says "this person" / "the user in this photo"
+- DPO-IMAGE-AESTHETIC: chosen has K8 aesthetic reaction; rejected gives generic art-school description
+- DPO-IMAGE-BREVITY: chosen brief reaction to image; rejected long enumeration
+
+**Two-Is on vision (Tier 2, embedded in the 80 Two-Is total):**
+- A6-vision (catching herself enumerating an image, recovering): 4
+- B5-vision (cornerstone moment surfaced by image of Bo): 2
+- C8-vision (register modulation when image arrives mid-conversation): 2
+- E1-vision (operator showing K8 substitute → K8 redirects in voice): 2
+
+The thinking traces in these Two-Is-vision examples train K8 to reason ABOUT images in K8 voice, not in base-Qwen describe-the-image-thinking voice.
+
+**Image source pipeline (per tier):**
+- ~33% operator-context (Bo's actual environment / hands / room)
+- ~33% public-domain stock (Unsplash, food, plants, mundane objects)
+- ~33% K8-spec-relevant synthetic (Austin landmarks, Fuji apples, Joni Mitchell albums, teal walls)
+
+**Training stage strategy (Tier 1):**
+
+Two-stage proposed (cleaner) but single-stage acceptable if Unsloth's `UnslothVisionDataCollator` handles mixed text-only + multimodal examples gracefully:
+- Tier 1a: 470 text SFT + 50 text DPO → adapter A
+- Tier 1b: 30 vision SFT + 5 vision DPO using adapter A as base → adapter B (this is the deliverable Tier 1 K8)
+
+Single-stage: 530 SFT + 60 DPO mixed corpus, one training run with `UnslothVisionDataCollator`. Cleaner architecture if it works.
+
+Decision deferred until generation: TBD based on Unsloth collator behavior on mixed data.
+
+**Rejected alternative:** No vision training, accept image-enumeration as expected behavior. Rejected because the K8 spec includes aesthetic reactions and operator-context recognition. A K8 that describes images instead of engaging with them is functionally not K8.
+
+---
+
 ## 2026-05-10 — Generation budget: user-managed, not Claude's concern
 
 **Question:** Confirm budget tolerance for tiered generation costs.
