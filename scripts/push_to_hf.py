@@ -99,6 +99,9 @@ def main():
                                   includes=["*.stderr.log", "*.log"])
 
     # 4. GGUFs → public model repo (Qwen3.5-9B.{Q4_K_M,Q5_K_M,Q6_K}.gguf at root)
+    # Unsloth's save_pretrained_gguf may write to either gguf_q5_k_m/ OR
+    # gguf_q5_k_m_gguf/ depending on internal logic. Strip the trailing
+    # "_gguf" suffix before extracting the quant label, matching K0's logic.
     if os.path.isdir(args.gguf_base_dir):
         for quant_subdir in sorted(Path(args.gguf_base_dir).iterdir()):
             if not (quant_subdir.is_dir() and quant_subdir.name.startswith("gguf_")):
@@ -106,9 +109,11 @@ def main():
             for ggfile in quant_subdir.rglob("*.gguf"):
                 if "mmproj" in ggfile.name:
                     continue
-                # Rename to canonical Qwen3.5-9B.<QUANT>.gguf
-                quant_label = quant_subdir.name.replace("gguf_", "").upper()
-                # gguf_q5_k_m → Q5_K_M
+                # Normalize: gguf_q5_k_m_gguf → gguf_q5_k_m → Q5_K_M
+                norm = quant_subdir.name
+                if norm.endswith("_gguf"):
+                    norm = norm[:-5]
+                quant_label = norm.replace("gguf_", "", 1).upper()
                 target_name = f"Qwen3.5-9B.{quant_label}.gguf"
                 results[f"gguf:{target_name}"] = hf_upload_to_repo(
                     str(ggfile), target_name, args.repo
