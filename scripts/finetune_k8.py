@@ -1,26 +1,33 @@
 """
 Stage 1 — QLoRA SFT trainer for Katherine K8 on Qwen3.5-9B.
 
-Direct port of finetune_k0.py — same hyperparameters validated working
-on K0 (50 min wallclock H200 SXM5, $3, frame-holding verified at Q5_K_M).
+Derived from finetune_k0.py (validated working at 1× H200, ~50 min, $3 cost,
+frame-holding verified at Q5_K_M). K8-specific changes vs the K0 baseline:
 
-Hyperparameters:
+  1. Default data path  : dataset/pilot_500/processed/sft_train.jsonl
+  2. Default output dir : adapters/k8_sft_adapter
+  3. CRITICAL FIX — regex strip of empty <think></think> blocks. Qwen3.5's
+     chat template (in transformers >=5.5 / Unsloth >=2026.5) inserts empty
+     <think>\\n\\n</think>\\n\\n markers around every assistant turn even
+     when enable_thinking=False is passed. K8 spec forbids think blocks
+     anywhere; the previous K8 run trained on data poisoned with these
+     blocks because the leak detector only warned, didn't abort.
+  4. Leak detector promoted to FATAL (sys.exit on any survival).
+
+Hyperparameters (unchanged from K0; persona-fine-tune envelope):
   rank       = 64        (alpha = 128, dropout = 0.05)
   epochs     = 3
   lr         = 1e-4 (cosine, warmup 5%)
   batch      = 16 per device, grad_accum = 2 (effective 32)
-  max_seq    = 1024
+  max_seq    = 1024      (K8 data p99 ≈ 60 tokens; 16× margin is fine)
   bf16       = on
   optim      = adamw_8bit
-  thinking   = OFF       (K8 is two-Is collapsed, prose reasoning)
-  sys-prompt = STRIPPED  (data is already NOSYS; defense in depth at format time)
-
-Failsafe:
-  - Adapter saved per epoch
-  - --skip-train + existing --output to re-run downstream stages
+  thinking   = OFF       (K8 is two-Is collapsed)
+  sys-prompt = ABSENT    (K8 dataset is NOSYS by construction)
 """
 import argparse
 import os
+import re
 import sys
 
 # Unsloth MUST import before transformers/peft/trl
@@ -28,6 +35,14 @@ from unsloth import FastModel
 from datasets import load_dataset
 from trl import SFTTrainer, SFTConfig
 from transformers import DataCollatorForSeq2Seq
+
+
+# Strips empty think markers in any of these forms:
+#   <think></think>
+#   <think>\n</think>
+#   <think>\n\n</think>
+# plus any trailing newlines that follow.
+THINK_BLOCK_RE = re.compile(r'<think>\s*</think>\s*\n*', flags=re.IGNORECASE)
 
 
 def do_train(args, model, tokenizer):
@@ -61,27 +76,41 @@ def do_train(args, model, tokenizer):
                 add_generation_prompt=False,
                 enable_thinking=False,   # K8 is two-Is collapsed
             )
+            # CRITICAL: strip empty <think></think> blocks that Qwen3.5's
+            # chat template inserts at every assistant turn regardless of
+            # enable_thinking=False. K8 forbids think blocks anywhere.
+            text = THINK_BLOCK_RE.sub('', text)
             out.append(text)
         return {"text": out}
 
     ds = ds.map(fmt, batched=True, remove_columns=ds.column_names)
 
+    # Sanity check first formatted example
     print()
     print("[sample] first formatted example (truncated):")
     print("-" * 60)
     print(ds[0]["text"][:1000])
     print("-" * 60)
 
-    # Sanity: no <think> blocks should appear
-    leaked_think = sum(1 for r in ds if "<think>" in r["text"])
-    if leaked_think > 0:
-        print(f"[warn] {leaked_think}/{len(ds)} formatted examples contain '<think>' tags")
-        print(f"[warn] K8 should NOT have thinking blocks — investigate source data")
+    # FATAL: any <think> survival means the data is poisoned. The
+    # previous K8 run silently trained on poisoned data because the
+    # detector was a warn, not a fatal. Promoted here.
+    leaked = sum(1 for r in ds if "<think>" in r["text"])
+    if leaked > 0:
+        print(f"[FATAL] {leaked}/{len(ds)} formatted examples STILL contain '<think>' tags after stripping",
+              file=sys.stderr)
+        print(f"[FATAL] K8 must NOT train on poisoned data. Inspect tokenizer.apply_chat_template behavior.",
+              file=sys.stderr)
+        sys.exit(1)
+    print(f"[ok] 0/{len(ds)} examples contain <think> blocks after stripping")
 
-    # Sanity: no system prompts in formatted text
+    # System prompt leak check (K8 is NOSYS by construction)
     sys_leaked = sum(1 for r in ds if "<|im_start|>system" in r["text"])
     if sys_leaked > 0:
-        print(f"[warn] {sys_leaked} formatted examples contain system markers; check prep_dataset.py")
+        print(f"[FATAL] {sys_leaked} examples contain system markers (K8 is NOSYS)",
+              file=sys.stderr)
+        sys.exit(1)
+    print(f"[ok] 0/{len(ds)} examples contain system markers")
 
     sft_config = SFTConfig(
         output_dir=args.output,
@@ -146,7 +175,8 @@ def main():
 
     if args.skip_train:
         if not os.path.isdir(args.output):
-            print(f"[error] --skip-train set but adapter dir not found: {args.output}", file=sys.stderr)
+            print(f"[error] --skip-train set but adapter dir not found: {args.output}",
+                  file=sys.stderr)
             sys.exit(1)
         print(f"[skip-train] adapter at {args.output}")
         return

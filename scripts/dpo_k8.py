@@ -1,20 +1,39 @@
 """
 Stage 2 — DPO trainer for Katherine K8, on top of the SFT adapter.
 
-Direct port of dpo_k0.py. Difference: K8 DPO data has chosen/rejected as
-plain strings (the K0 path expected list-of-message-dicts). Format function
-adapted for the simpler schema.
+Derived from dpo_k0.py with these K8-specific changes:
 
-Hyperparameters (matching K0 validated config):
+  1. Default data path  : dataset/pilot_500/processed/dpo_train.jsonl
+  2. Default sft-adapter / output paths : adapters/k8_*
+  3. Source data shape  : K8 stores chosen/rejected as PLAIN STRINGS
+     (not list-of-message-dicts as K0 did). The fmt function reads
+     ex["chosen"] and ex["rejected"] directly without [0]["content"].
+  4. CRITICAL FIX — regex strip of empty <think></think> markers in the
+     formatted prompt string. Same root cause as the SFT script: Qwen3.5's
+     chat template inserts these regardless of enable_thinking=False.
+  5. CRITICAL FIX — explicit `.select_columns(["prompt", "chosen",
+     "rejected"])` AFTER the format map. The previous K8 run failed with
+     `KeyError: "Invalid keys in the example: {'messages', 'rejected',
+     'chosen', 'prompt'}"` because TRL 0.24's _prepare_dataset re-adds
+     'messages' from the prompt string when the prompt looks
+     conversational, then refuses with both 'messages' and 'prompt'
+     present. remove_columns alone is no longer sufficient defense.
+
+Hyperparameters (unchanged from K0):
   epochs       = 2
-  lr           = 5e-6
-  beta         = 0.1
+  lr           = 5e-6     (DPO needs gentle steps)
+  beta         = 0.1      (KL strength to reference; standard)
   batch        = 4 per device, grad_accum = 2 (effective 8)
   max_seq      = 1024
   optim        = adamw_8bit
+
+DPOTrainer uses adapter-disabled forward as the reference model (PEFT trick;
+saves a model copy in VRAM). The SFT adapter loaded as the policy is also
+the reference snapshot.
 """
 import argparse
 import os
+import re
 import sys
 
 from unsloth import FastModel
@@ -22,11 +41,15 @@ from datasets import load_dataset
 from trl import DPOTrainer, DPOConfig
 
 
-def fmt_dpo_example(ex, tokenizer):
-    """Convert {messages: [...], chosen: str, rejected: str} → DPO trio.
+THINK_BLOCK_RE = re.compile(r'<think>\s*</think>\s*\n*', flags=re.IGNORECASE)
 
-    The K8 dataset stores messages array (ending in user) + chosen/rejected
-    as plain strings. DPOTrainer needs prompt str + chosen str + rejected str.
+
+def fmt_dpo_example(ex, tokenizer):
+    """K8 raw {messages, chosen (str), rejected (str)} → TRL standard
+    {prompt (str), chosen (str), rejected (str)}.
+
+    K8 source schema: messages ends with role:user; chosen and rejected
+    are candidate assistant final-turn replies as plain strings.
     """
     msgs = ex["messages"]
     msgs = [m for m in msgs if m.get("role") != "system"]
@@ -36,9 +59,11 @@ def fmt_dpo_example(ex, tokenizer):
         add_generation_prompt=True,
         enable_thinking=False,
     )
+    # Strip empty <think></think> markers Qwen3.5's chat template inserts.
+    prompt_str = THINK_BLOCK_RE.sub('', prompt_str)
     return {
         "prompt": prompt_str,
-        "chosen": ex["chosen"],
+        "chosen": ex["chosen"],     # already a plain string in K8 schema
         "rejected": ex["rejected"],
     }
 
@@ -46,7 +71,8 @@ def fmt_dpo_example(ex, tokenizer):
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--data", default="dataset/pilot_500/processed/dpo_train.jsonl")
-    p.add_argument("--sft-adapter", default="adapters/k8_sft_adapter")
+    p.add_argument("--sft-adapter", default="adapters/k8_sft_adapter",
+                   help="SFT adapter to load as policy starting point")
     p.add_argument("--output", default="adapters/k8_dpo_adapter")
     p.add_argument("--max_seq", type=int, default=1024)
     p.add_argument("--epochs", type=int, default=2)
@@ -59,7 +85,8 @@ def main():
 
     if args.skip_train:
         if not os.path.isdir(args.output):
-            print(f"[error] --skip-train set but DPO adapter dir not found: {args.output}", file=sys.stderr)
+            print(f"[error] --skip-train set but DPO adapter dir not found: {args.output}",
+                  file=sys.stderr)
             sys.exit(1)
         print(f"[skip-train] DPO adapter at {args.output}")
         return
@@ -81,15 +108,25 @@ def main():
     ds = load_dataset("json", data_files=args.data, split="train")
     print(f"[data] {len(ds)} preference pairs loaded")
 
-    # IMPORTANT: remove all original columns. The K8 dataset stores
-    # {messages, chosen, rejected, _cat, _type}. After fmt we want
-    # {prompt, chosen, rejected} only. If we don't drop the originals,
-    # TRL's DPOTrainer sees both 'messages' AND 'prompt' keys and
-    # rejects with: "Invalid keys in the example: {messages, ...}"
+    # Format raw rows into the TRL-expected {prompt, chosen, rejected} string trio.
     ds = ds.map(
         lambda ex: fmt_dpo_example(ex, tokenizer),
         remove_columns=ds.column_names,
     )
+
+    # CRITICAL DEFENSIVE: TRL 0.24's _prepare_dataset re-adds 'messages' if the
+    # prompt looks conversational, then rejects with `KeyError: Invalid keys...`
+    # if 'messages' AND 'prompt' coexist. select_columns explicitly lists what
+    # we keep; reliable across datasets/TRL versions.
+    ds = ds.select_columns(["prompt", "chosen", "rejected"])
+
+    # Sanity: no <think> blocks should survive
+    leaked = sum(1 for ex in ds if "<think>" in ex["prompt"])
+    if leaked > 0:
+        print(f"[FATAL] {leaked}/{len(ds)} DPO prompts contain '<think>' blocks after stripping",
+              file=sys.stderr)
+        sys.exit(1)
+    print(f"[ok] 0/{len(ds)} DPO prompts contain <think> blocks")
 
     print("[sample] first DPO example:")
     print("-" * 60)
@@ -121,7 +158,7 @@ def main():
 
     trainer = DPOTrainer(
         model=model,
-        ref_model=None,
+        ref_model=None,                     # adapter-disabled forward = reference
         args=dpo_config,
         train_dataset=ds,
         tokenizer=tokenizer,
