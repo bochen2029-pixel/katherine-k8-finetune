@@ -81,7 +81,15 @@ def main():
     ds = load_dataset("json", data_files=args.data, split="train")
     print(f"[data] {len(ds)} preference pairs loaded")
 
-    ds = ds.map(lambda ex: fmt_dpo_example(ex, tokenizer))
+    # IMPORTANT: remove all original columns. The K8 dataset stores
+    # {messages, chosen, rejected, _cat, _type}. After fmt we want
+    # {prompt, chosen, rejected} only. If we don't drop the originals,
+    # TRL's DPOTrainer sees both 'messages' AND 'prompt' keys and
+    # rejects with: "Invalid keys in the example: {messages, ...}"
+    ds = ds.map(
+        lambda ex: fmt_dpo_example(ex, tokenizer),
+        remove_columns=ds.column_names,
+    )
 
     print("[sample] first DPO example:")
     print("-" * 60)
