@@ -102,12 +102,29 @@ def main():
     # Unsloth's save_pretrained_gguf may write to either gguf_q5_k_m/ OR
     # gguf_q5_k_m_gguf/ depending on internal logic. Strip the trailing
     # "_gguf" suffix before extracting the quant label, matching K0's logic.
+    #
+    # IMPORTANT: include the mmproj file. K8 inherits Qwen3.5-9B's native
+    # vision encoder. Unsloth produces a {model}.BF16-mmproj.gguf alongside
+    # each quantized GGUF. The mmproj is REQUIRED for vision in LM Studio
+    # and llama.cpp-compatible runtimes — without it, the model loads as
+    # text-only. Push ONE copy of the mmproj at repo root (it's the same
+    # ~880 MB file across all quants).
+    pushed_mmproj = False
     if os.path.isdir(args.gguf_base_dir):
         for quant_subdir in sorted(Path(args.gguf_base_dir).iterdir()):
             if not (quant_subdir.is_dir() and quant_subdir.name.startswith("gguf_")):
                 continue
             for ggfile in quant_subdir.rglob("*.gguf"):
                 if "mmproj" in ggfile.name:
+                    # Push exactly one copy of the mmproj; conventionally
+                    # named mmproj-F16.gguf in the lmstudio-community / GGUF
+                    # ecosystem. K8 model repo gets one at root.
+                    if not pushed_mmproj:
+                        target_mmproj = "mmproj-F16.gguf"
+                        results[f"gguf:{target_mmproj}"] = hf_upload_to_repo(
+                            str(ggfile), target_mmproj, args.repo
+                        )
+                        pushed_mmproj = True
                     continue
                 # Normalize: gguf_q5_k_m_gguf → gguf_q5_k_m → Q5_K_M
                 norm = quant_subdir.name

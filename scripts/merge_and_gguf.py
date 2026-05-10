@@ -15,7 +15,8 @@ import os
 import sys
 from pathlib import Path
 
-from unsloth import FastModel
+# FastVisionModel preserves Qwen3.5-9B vision tower for mmproj export
+from unsloth import FastVisionModel
 
 
 def main():
@@ -30,8 +31,8 @@ def main():
         print(f"[error] adapter not found: {args.adapter}", file=sys.stderr)
         sys.exit(1)
 
-    print(f"[load] adapter: {args.adapter}")
-    model, tokenizer = FastModel.from_pretrained(
+    print(f"[load] adapter (vision-aware loader): {args.adapter}")
+    model, tokenizer = FastVisionModel.from_pretrained(
         model_name=args.adapter,
         max_seq_length=args.max_seq,
         load_in_4bit=True,
@@ -55,19 +56,26 @@ def main():
             # Unsloth appends "_gguf" suffix to output dir; search both
             search_dirs = [out_dir, f"{out_dir}_gguf"]
             produced = []
+            mmproj_found = []
             for sd in search_dirs:
                 if not os.path.isdir(sd):
                     continue
                 for root, _, files in os.walk(sd):
                     for fn in files:
-                        if fn.endswith(".gguf") and "mmproj" not in fn:
-                            full = os.path.join(root, fn)
-                            size_mb = os.path.getsize(full) / (1024 * 1024)
+                        if not fn.endswith(".gguf"):
+                            continue
+                        full = os.path.join(root, fn)
+                        size_mb = os.path.getsize(full) / (1024 * 1024)
+                        if "mmproj" in fn:
+                            mmproj_found.append((full, size_mb))
+                        else:
                             produced.append((full, size_mb))
             if produced:
                 for f, sz in produced:
                     print(f"[gguf] OK: {f}  ({sz:.0f} MB)")
-                successes.append((quant, produced))
+                for f, sz in mmproj_found:
+                    print(f"[gguf] OK (vision): {f}  ({sz:.0f} MB)")
+                successes.append((quant, produced + mmproj_found))
             else:
                 print(f"[gguf] WARN: no .gguf file found in {out_dir} or {out_dir}_gguf")
                 failures.append((quant, "no .gguf produced"))

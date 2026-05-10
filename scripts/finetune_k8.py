@@ -30,8 +30,14 @@ import os
 import re
 import sys
 
-# Unsloth MUST import before transformers/peft/trl
-from unsloth import FastModel
+# Unsloth MUST import before transformers/peft/trl.
+# CRITICAL: use FastVisionModel for Qwen3.5-9B (vision-language model).
+# FastModel is the LLM-aware loader and will silently strip the vision tower
+# during get_peft_model — the resulting GGUF loses image input capability.
+# FastVisionModel + finetune_vision_layers=False preserves the native vision
+# tower while LoRA-tuning only the language layers. See
+# memory/reference_unsloth_vision_gguf.md for full diagnosis.
+from unsloth import FastVisionModel
 from datasets import load_dataset
 from trl import SFTTrainer, SFTConfig
 from transformers import DataCollatorForSeq2Seq
@@ -46,17 +52,21 @@ THINK_BLOCK_RE = re.compile(r'<think>\s*</think>\s*\n*', flags=re.IGNORECASE)
 
 
 def do_train(args, model, tokenizer):
-    """Attach LoRA, format dataset, train, save adapter."""
-    model = FastModel.get_peft_model(
+    """Attach LoRA via FastVisionModel (preserves Qwen3.5-9B native vision tower)."""
+    model = FastVisionModel.get_peft_model(
         model,
+        # Vision tower is preserved by NOT fine-tuning it. The K8 LoRA only
+        # touches the language path; vision encoder stays at base weights and
+        # remains usable post-merge for the GGUF mmproj export.
+        finetune_vision_layers=False,
+        finetune_language_layers=True,
+        finetune_attention_modules=True,
+        finetune_mlp_modules=True,
         r=args.rank,
-        target_modules=[
-            "q_proj", "k_proj", "v_proj", "o_proj",
-            "gate_proj", "up_proj", "down_proj",
-        ],
         lora_alpha=args.alpha,
         lora_dropout=args.dropout,
         bias="none",
+        target_modules="all-linear",
         use_gradient_checkpointing="unsloth",
         random_state=3407,
     )
@@ -181,8 +191,8 @@ def main():
         print(f"[skip-train] adapter at {args.output}")
         return
 
-    print(f"[load] base model: {args.model}")
-    model, tokenizer = FastModel.from_pretrained(
+    print(f"[load] base model (vision-aware loader): {args.model}")
+    model, tokenizer = FastVisionModel.from_pretrained(
         model_name=args.model,
         max_seq_length=args.max_seq,
         load_in_4bit=True,

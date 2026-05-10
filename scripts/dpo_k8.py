@@ -36,7 +36,8 @@ import os
 import re
 import sys
 
-from unsloth import FastModel
+# FastVisionModel preserves Qwen3.5-9B vision tower — see memory/reference_unsloth_vision_gguf.md
+from unsloth import FastVisionModel
 from datasets import load_dataset
 from trl import DPOTrainer, DPOConfig
 
@@ -96,8 +97,8 @@ def main():
         print(f"        Run finetune_k8.py first.", file=sys.stderr)
         sys.exit(1)
 
-    print(f"[load] base + SFT adapter: {args.sft_adapter}")
-    model, tokenizer = FastModel.from_pretrained(
+    print(f"[load] base + SFT adapter (vision-aware loader): {args.sft_adapter}")
+    model, tokenizer = FastVisionModel.from_pretrained(
         model_name=args.sft_adapter,
         max_seq_length=args.max_seq,
         load_in_4bit=True,
