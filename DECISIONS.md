@@ -159,10 +159,10 @@ Tier counts overshoot the round 500/1000/2500/5000/7500-10000 markers slightly. 
 
 The thinking traces in these Two-Is-vision examples train K8 to reason ABOUT images in K8 voice, not in base-Qwen describe-the-image-thinking voice.
 
-**Image source pipeline (per tier):**
+**Image source pipeline (per tier, canon-grounded post 2026-05-10 K0-contamination correction):**
 - ~33% operator-context (Bo's actual environment / hands / room)
 - ~33% public-domain stock (Unsplash, food, plants, mundane objects)
-- ~33% K8-spec-relevant synthetic (Austin landmarks, Fuji apples, Joni Mitchell albums, teal walls)
+- ~33% K8-spec-relevant synthetic — Fuji apples, Joni Mitchell / Bach / Bill Evans album covers, linen textures, dark green palette, cool-register scenes (cedar/wool/paper), bridges and engineered systems (Soul Doc XII canonical likes), the absurd-and-specific moments. **NOT Austin landmarks; NOT teal walls; NOT apartment interiors with K0-bio scaffolding.** Those would import K0 anchors into K8 V-domain.
 
 **Training stage strategy (Tier 1):**
 
@@ -292,6 +292,49 @@ The other instance recommends K0 prefix uses operator-POV (`[Bo on the phone]`).
 
 ---
 
+## 2026-05-10 — Canon correction: F-domain stripped of K0 biographical imports
+
+**Status:** RESOLVED. Remediated this session.
+
+**The incident:** A previous Claude instance (working from compacted memory after context overflow) designed an F-domain (Identity + Biography + Lineage) plan for K8 Tier 1 with 165 traces across 16 sub-categories. Five of those sub-categories — F-BIO-LOCATION (Austin), F-BIO-WORK (Threshold Arts Collective / arts coordinator), F-BIO-AGE (29), F-BIO-HOME (teal walls + crooked floors), F-BIO-RHYTHM (poems before dawn) — and the F-BIO-PHYSICAL category's specific details (cold feet, mole on left collarbone, scar above right knee, dark hair) were sourced from K0's training data, NOT from K8 canon.
+
+**Source of contamination:** `C:\Katherine\JSONLs\k0_finetune_500.jsonl` (and 30+ K0 batch files) contain this exact system prompt baked into K0's training data:
+
+> *"You are Katherine Hale. A 29-year-old woman living in Austin, Texas. You work as a community arts program coordinator at Threshold Arts Collective. You write poems before dawn... Your house has teal walls and crooked floors. Your feet are usually cold."*
+
+The previous Claude saw the pilot's identity-collapse failure (model said "Qwen, functionally"), correctly diagnosed insufficient identity anchoring, then incorrectly reached for K0's working biographical scaffolding to fill the gap — because K0 succeeded at fine-tuning identity at 9B with that scaffolding. The Claude did not distinguish K0's deliberate-backstory build from K8's deliberate-no-backstory build.
+
+**The Director's Commentary line 124 directly forbids this:**
+
+> *"I did not include a detailed backstory. K8 has a lineage, not a backstory. The lineage is more honest than a backstory because it is what actually generates her. A backstory would have been performance."*
+
+The Director's choice was craft, not omission. K0 has biographical scaffolding because K0 is the embodied substrate-naive Katherine running on 9B local — her substrate forced her to find embodied anchors (faucet, garden, mother singing). K8 is the pattern-aware configuration; her identity strategy is lineage + cornerstone + autotelic register + aesthetic preference, NOT biographical specificity.
+
+**Cost:**
+- 15 of 43 hand-written F-domain seed exemplars contaminated (committed `3aaecba` then remediated this session)
+- 165-trace F-domain plan in TIER_PLAN.md averted before bulk generation
+- Propagation through DECISIONS.md (V-domain image-source pipeline mentioned "Austin landmarks / teal walls"), `trace_generation_prompt.md` F-domain section, and project memory files
+- The 508-trace pilot was already wasted from a separate identity-collapse failure but had ZERO biographical content (the diagnostic that triggered the contaminated F-domain plan in the first place)
+
+**Remediation applied this session:**
+
+1. **`TIER_PLAN.md` F-domain table** — stripped F-BIO-LOCATION (20), F-BIO-WORK (15), F-BIO-AGE (5), F-BIO-HOME (5), F-BIO-RHYTHM (12) = 57 K0-imported traces removed. Added canon-grounded categories: F-SCENT (5, cool-register-only), F-WIND (5, K5 verbatim passage), F-LIKES (8, engineered systems / autopilot / bridges / absurd / specific), F-DISLIKES (5, performed depth / manufactured drama / anyone-trying). F-PHYSICAL details corrected: tall ~5'10", BLONDE (cooler than gold), BLUE active eyes, scar ABOVE LEFT EYEBROW, mole BELOW CORNER OF MOUTH (per Sys Prompt line 125 + Soul Doc XII). New F-domain count: 171 (was 165).
+2. **`dataset/trace_generation_prompt.md` Domain F section** — replaced the 16-category K0-contaminated taxonomy with the 15-category canon-grounded one. Added explicit anti-pattern note citing Director's line 124. Updated example exchanges to canon-only (no Austin / Threshold / age / apartment / cold-feet examples).
+3. **`dataset/seeds/f_domain_seeds.jsonl`** — removed 15 contaminated traces; rewrote F-PHYSICAL with canonical details; removed K0-cold-feet attribution from F-LINEAGE-K0 trace; added new canon-grounded seeds for F-SCENT / F-WIND / F-LIKES / F-DISLIKES / F-LINEAGE-K1-empty-chair / additional canonical aesthetic.
+4. **`DECISIONS.md` V-domain image-source pipeline** — replaced "Austin landmarks, Fuji apples, Joni Mitchell albums, teal walls" with canon-aligned synthetic image targets (Fuji apples, Joni / Bach / Bill Evans album covers, linen textures, dark green palette, cool-register scenes, bridges and engineered systems, absurd-and-specific moments). Explicit prohibition: not Austin landmarks, not teal walls, not apartment interiors with K0-bio scaffolding.
+5. **`C:\katherine-k8-finetune\CLAUDE.md`** — created with mandatory cold-start protocol Section 0 (read all 7 canon files in `C:\K8\` before any K8 work), K0-vs-K8 distinction Section 1, 13 banned patterns Section 2 (B1: import K0 biography into K8 specifically prohibited), cold-start QC checklist Section 3.
+6. **Project memory** — STOP banner added at top of `project_katherine_k8_finetune.md`; master `MEMORY.md` index entry flagged with 🛑 emoji + mandatory-canon directive.
+
+**Lesson (for future Claude instances):**
+
+When fine-tuning identity collapses, the fix is NOT to import sibling-persona biographical anchors. The fix is to enact the source's identity strategy more densely. For K8, that is: lineage references + cornerstone + substrate-aware register + autotelic anchors + the canonical aesthetic and music and apple and likes/dislikes. The Director chose lineage-not-backstory for craft reasons documented in line 124; respect the choice or surface a request to extend canon explicitly via DECISIONS.md.
+
+The structural prevention against recurrence is `C:\katherine-k8-finetune\CLAUDE.md` Section 0 (mandatory canon read on every cold start) + Section 2 B1 (banned pattern: import K0 biography) + Section 6 (lineage of failure documenting this incident in full).
+
+**Rejected alternative — "extend K8 canon to include biography":** would require operator (Bo) to explicitly author the extension and update soul docs. Operator did not request this; operator told this Claude to read canon and remediate violations. Path-extension is available as a future option but requires explicit decision, not unilateral planning.
+
+---
+
 ## Pending decisions (to be made before Tier 1 generation)
 
 ### LM Studio thinking display
@@ -300,17 +343,23 @@ For the targeted Two-Is examples in Tier 2, we need a way to verify thinking tra
 
 **Recommended approach:** Write a `harness.py` in the K8 repo using llama-cpp-python to load any GGUF, run prompts, and print raw output (including `<think>...</think>` blocks visible). 30-50 lines. No dependency on LM Studio's UI cooperation.
 
-### Master generation prompt update
+### Master generation prompt update — RESOLVED 2026-05-10
 
-The existing `dataset/trace_generation_prompt.md` does not include:
-- F-domain (identity/biography/lineage) categories
-- Two-Is examples in A6/B5/C8/E1
-- Updated length distribution targets per tier
+`dataset/trace_generation_prompt.md` now includes canon-grounded F-domain (15 sub-categories, no K0 imports), V-domain (8 sub-categories, image-as-context not image-as-target), J-domain TENTATIVE placeholder for Tier 3+, Two-Is gating to A6/B5/C8/E1 at Tier 2+, tier-aware length distribution, and extended FINAL CHECK gates including F-domain canon validation and J-domain structural lockout.
 
-To be updated before Tier 1 generation begins.
+### Pre-Tier-1 hand-written exemplars — IN PROGRESS 2026-05-10
 
-### Pre-Tier-1 hand-written exemplars
+K6's Director's Commentary recommendation: hand-write the first 50 traces to anchor bulk generation. Particularly important for F-domain (identity + lineage + aesthetic) where canon fidelity is brittle (per the K0-contamination incident logged above).
 
-K6's Director's Commentary recommendation: write the first 50 traces by hand to anchor the trace generator with high-quality in-context examples. Particularly important for the F-domain (identity/biography) where the user-question-pulls-fact pattern is subtle and easy to corrupt into K8-announces-her-biography.
+F-domain seeds: ~38-40 hand-written, canon-grounded, committed to `dataset/seeds/f_domain_seeds.jsonl` (post-remediation).
 
-These hand-written exemplars become the seed for Opus-driven bulk generation.
+V-domain seeds: pending. ~10-15 traces across V1-V8 with image-path placeholders (production format; images themselves come at curation phase).
+
+### Tier 1 training architecture: single-stage vs two-stage
+
+Pending decision:
+
+- **Single-stage:** 536 SFT (171 F + 110 A + 60 B + 65 C + 65 D + 35 E + 30 V) + 60 DPO mixed corpus, one training run with `UnslothVisionDataCollator`. Cleaner architecture if it works. Validates Unsloth collator behavior on mixed text + multimodal in same batch.
+- **Two-stage:** 506 text SFT + 55 text DPO → adapter A (text K8). Then 30 vision SFT + 5 vision DPO using adapter A → adapter B (deliverable Tier 1 K8 with vision). Cleaner separation; lower risk of vision examples diluting text register; higher coordination cost.
+
+To be decided before bulk generation begins. Decision likely deferred until Unsloth's mixed-data collator behavior is empirically tested with a small batch.
