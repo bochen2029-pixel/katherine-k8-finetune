@@ -48,6 +48,9 @@ unsloth_compiled_cache/
 *.swp
 *.swo
 
+# Local backups before edits
+.backup_*/
+
 # OS
 .DS_Store
 Thumbs.db
