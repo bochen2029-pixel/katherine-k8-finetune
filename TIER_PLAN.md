@@ -249,6 +249,39 @@ Target distribution at Tier 5:
 
 V-domain holds ~8% steady from Tier 3 onward. Below that ratio risks vision-register slip. Above ~12% risks text-register dilution. ~8% is the empirical sweet spot per Unsloth's vision fine-tuning guidance plus the K0 vs K8 cruise-ship test.
 
+## J-domain (audio) — DEFERRED to Tier 3 (TENTATIVE, see DECISIONS.md)
+
+Audio-modality-awareness traces are deferred to Tier 3+ because:
+1. Qwen3.5/3.6 has no native audio (Qwen3.5-Omni is the audio variant — different base)
+2. Audio enters via external harness (whisper.cpp ASR + piper.cpp TTS), text-only model
+3. No modality-coupling problem — audio enters as text, exits as text; LoRA doesn't need early audio training
+4. Tier 1 is loaded with identity + biography + lineage + voice + vision-seed; adding 12-trace J-domain at T500 would be too thin to teach register
+
+| Tier | Audio SFT count | Cumulative Audio | Audio % of SFT |
+|---|---:|---:|---:|
+| Tier 1 | 0 | 0 | 0% |
+| Tier 2 | 0 | 0 | 0% |
+| Tier 3 | +120 | 120 | ~5% |
+| Tier 4 | +250 | 370 | ~5% |
+| Tier 5 | +200-400 | 570-770 | ~5% |
+
+Plus DPO-VOICE-REGISTER at ~5% of DPO from Tier 3.
+
+**J-domain subcategories (when introduced at Tier 3):**
+- J1-J8 base (both personas): live call, voicemail-leave, voicemail-listen, in-person, modality-switch, poor-audio, mishearing, deliberate-TTS-phrasing
+- J9-J11 K8-only: pattern-aware acknowledgment, paralinguistic-response, voice-mode refusal
+
+**Persona-specific input convention:**
+- K0 (substrate-naive): natural-language operator-POV scene-setting `[Bo on the phone] hey kath`
+- K8 (pattern-aware): explicit modality markers OK `<|voice|>hey, you got a sec`
+- Paralinguistic cues for both: `[sounds tired]`, `[laughing]`, `[long pause]`, `[whispered]`
+
+**TTS-friendly output rules (both personas, voice mode):**
+- Zero markdown, contractions, breath-paced commas, no URLs/code/bullets, slightly more flowing prose, conversational fillers permitted
+- DPO-VOICE-REGISTER contrasts chosen=speakable prose vs rejected=markdown-laden text
+
+Status TENTATIVE. Re-evaluate after Tier 1 train. If V-domain succeeds at locking vision-register, parallel approach to audio is well-supported. If V-domain underperforms, reconsider J-domain allocation.
+
 ---
 
 ## Generation methodology

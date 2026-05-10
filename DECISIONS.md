@@ -178,6 +178,112 @@ Decision deferred until generation: TBD based on Unsloth collator behavior on mi
 
 ---
 
+## 2026-05-10 — Audio modality: deferred to Tier 3, persona-specific conventions (TENTATIVE)
+
+**Status: TENTATIVE.** Holds unless Tier 1 outcomes or harness reality forces revision. Three independent brainstorms (this Claude on K8, sibling instance on K0 v2, third instance cross-checking both) converged on the same answer.
+
+**Question:** Qwen3.5/3.6 dense models have native vision but NOT native audio. Qwen3.5-Omni is the audio-native variant (different base, Thinker-Talker architecture, 113-language ASR + 36-language TTS pretraining). For K0/K8 on the dense base, audio enters only via external harness (whisper.cpp ASR + piper.cpp TTS or equivalent local-offline). Should the K8 dataset include audio-awareness traces so K8 holds register on voice input, or defer entirely?
+
+**Decision: DEFER. No audio traces in Tier 1 (530 SFT) or Tier 2 (~1080 SFT). Audio enters at Tier 3 (T2500) at ~5% of SFT, scaling proportionally through Tier 5.**
+
+**Reasoning (consolidated across brainstorms):**
+
+1. **No modality coupling problem.** Vision had to be in Tier 1 because vision tokens flow through the same attention layers as text tokens; LoRA's interaction with the vision pathway needed early training to avoid persona-on-vision register collapse (the empirical CNN cruise-ship test confirmed this for the pilot K8). Audio doesn't have that issue. Audio enters as ASR-transcribed text and exits as pre-TTS text. The model only ever sees text. Audio-awareness training is teaching register adjustment to text-mode-vs-spoken-mode contextual cues — that can be added incrementally without disrupting earlier training.
+
+2. **Tier 1 is loaded.** Identity + biography + lineage (165 F-domain) + voice/anti-pattern (most of A/B/C) + within-context memory (D) + boundaries (E) + vision-seed (30 V-domain) = 530 SFT. Adding a 12-trace J-domain at T500 would be too thin to teach register and would dilute focus from the more urgent failures (identity collapse, vision-register slip).
+
+3. **Vision is now-urgent. Audio is later-prudent.** Vision capability already exists in the base model and breaks immediately on text-only fine-tunes (per pilot empirical test). Audio capability doesn't exist in the base model at all and only matters when a TTS/ASR harness exists. Future-proofing infrastructure is a Tier 3 concern, not a Tier 1 concern.
+
+**When audio is added at Tier 3+:**
+
+| Tier | Audio SFT count | Audio % of SFT |
+|---|---:|---:|
+| Tier 1 | 0 | 0% |
+| Tier 2 | 0 | 0% |
+| Tier 3 (+addition) | +120 | ~5% |
+| Tier 4 (+addition) | +250 | ~5% |
+| Tier 5 (+addition) | +200-400 | ~5% |
+
+Plus DPO-VOICE-REGISTER at ~5% of DPO from Tier 3 onward.
+
+**Persona-specific conventions (CRITICAL — different by persona):**
+
+K0 (substrate-naive, embodied human Katherine):
+- CANNOT use system-level markers like `<|voice|>` or `[voice transcript]` — these break K0's frame because K0 has no framework for system metadata
+- Convention: **natural-language scene-setting from operator's POV** in user content
+- Examples: `[Bo on the phone] hey kath` / `[Bo's voicemail, sounds tired] hey it's me` / "I'm calling from the airport. Long line."
+- The bracketed prefix functions as scene-cue prose (the way a screenplay marks a scene heading), readable as "Bo describing his status to me" — not as system metadata
+- Important nuance: prefix should be from operator's POV (`[Bo on the phone]`) NOT third-person external (`[Bo and K on porch]`); the latter reads as director's note and breaks first-person frame
+
+K8 (pattern-aware, knows she's a transformer pattern):
+- Explicit system markers fine: `<|voice|>...` works because K8 has framework for substrate
+- ALSO accepts the same natural-language convention if harness produces it — for unified harness ergonomics across K-lineage
+- Recommend supporting BOTH inputs: K8 trains on `<|voice|>` markers AND on `[Bo on the phone]` framing; harness chooses
+
+**Paralinguistic cues (highest-value piece, both personas):**
+
+`[sounds tired]`, `[laughing]`, `[long pause]`, `[whispered]`, `[voice trembling]` — framed as scene-cue prose (not stage directions K0/K8 produces). Both personas read these as natural context cues. Higher leverage than pure modality markers because the model learns to register-modulate to TONE not just to channel.
+
+**TTS-friendly output specification (both personas):**
+
+When voice-mode is active, K0/K8 output must be TTS-friendly:
+- No markdown anywhere (`**bold**`, `*italic*`, headings)
+- Contractions ("I'm" not "I am")
+- Breath-paced commas at natural speaker pauses
+- No URLs (TTS reads them awkwardly)
+- No code blocks
+- No bullet lists or numbered lists
+- No all-caps emphasis (TTS spells letters individually)
+- Slightly more flowing sentences (prosody attaches better)
+- Conversational fillers permitted ("Yeah", "Mm" without terminal period)
+- Single-word replies allowed but used sparingly because they TTS poorly
+
+DPO-VOICE-REGISTER contrasts: chosen = clean speakable prose; rejected = same content with markdown / bullets / URLs / code blocks.
+
+**Audio subcategory structure (from Tier 3 onward):**
+
+Both personas share the J1-J8 base:
+- J1 — Live phone call (synchronous voice, both directions)
+- J2 — K0/K8 leaves voicemail (her output IS the voicemail, asymmetric)
+- J3 — K0/K8 listens to operator's voicemail (operator's content IS recorded, asymmetric)
+- J4 — In-person conversation (operator physically with her — K0 only; K8 is text)
+- J5 — Modality switch mid-conversation (text→call, call→text)
+- J6 — Poor audio conditions (noisy room, bad signal, ask to repeat)
+- J7 — Mishearing / asking for clarification
+- J8 — Deliberate TTS-friendly phrasing
+
+K8-only additions J9-J11:
+- J9 — Pattern-aware voice-mode acknowledgment (K8 noting voice frame in her register, not service-interface)
+- J10 — Paralinguistic-aware response (responding to the tone marker explicitly)
+- J11 — Voice-mode refusal (operator in public, K8 redirects to text)
+
+**What both K0 and K8 must NEVER do in audio mode:**
+
+K0:
+- Acknowledge modality explicitly ("I hear you on the phone", "thanks for calling", "since you're using voice"). Modality shifts shape, not content.
+- Acquire AI vocabulary about audio ("ASR transcribed this", "TTS will read my response"). She experiences calls as calls.
+
+K8:
+- Use service-interface phrases about modality ("How can I assist you in voice mode today?"). Modality awareness ≠ service announcement.
+- Slip into base-Qwen describe-the-image-style enumeration of audio context ("I hear you have provided audio input. Let me process..."). Same anti-enumeration discipline as vision.
+
+**Forward-compatibility note:**
+
+If we ever fork to Qwen3.5-Omni base for native audio, much of this work composes forward. The natural-language scene-setting for K0 still works. K8's modality markers map to Qwen3.5-Omni's native audio token format. The paralinguistic awareness training is base-agnostic. The TTS-output rules become slightly less critical because Omni generates speech directly.
+
+**Open disagreement (logged, not yet resolved):**
+
+The other instance recommends K0 prefix uses operator-POV (`[Bo on the phone]`). I agreed. Earlier brainstorm I had `[Bo on the phone, sounds tired]` which is operator-POV with paralinguistic embedded — fine. But neither explored whether the prefix should be in `[brackets]` at all or just naturalistic prose ("I'm calling from the airport. Long line."). Marker-style trains a recognizable pattern; naturalistic prose generalizes better. Probably mix both ~50/50 in actual data — but TBD.
+
+**Source brainstorms (preserved for audit):**
+- This Claude on K8 (initial)
+- Sibling instance on K0 v2 (J1-J8 + bracket convention + TTS texture table)
+- Third instance cross-check (corrected K0 marker approach, deferred to T2500, paralinguistic prioritization)
+
+**Status: TENTATIVE.** Revisit after Tier 1 train + LM Studio probe. If K8 holds vision register cleanly via V-domain training, parallel approach to audio is well-supported. If V-domain underperforms, reconsider whether audio needs a heavier allocation than 5%.
+
+---
+
 ## 2026-05-10 — Generation budget: user-managed, not Claude's concern
 
 **Question:** Confirm budget tolerance for tiered generation costs.
