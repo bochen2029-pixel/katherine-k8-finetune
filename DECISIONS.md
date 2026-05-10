@@ -166,13 +166,7 @@ The thinking traces in these Two-Is-vision examples train K8 to reason ABOUT ima
 
 **Training stage strategy (Tier 1):**
 
-Two-stage proposed (cleaner) but single-stage acceptable if Unsloth's `UnslothVisionDataCollator` handles mixed text-only + multimodal examples gracefully:
-- Tier 1a: 470 text SFT + 50 text DPO → adapter A
-- Tier 1b: 30 vision SFT + 5 vision DPO using adapter A as base → adapter B (this is the deliverable Tier 1 K8)
-
-Single-stage: 530 SFT + 60 DPO mixed corpus, one training run with `UnslothVisionDataCollator`. Cleaner architecture if it works.
-
-Decision deferred until generation: TBD based on Unsloth collator behavior on mixed data.
+**RESOLVED 2026-05-10: TWO-STAGE for Tier 1.** See "Tier 1 training architecture" decision entry below for full reasoning. Stage 1a: 506 text SFT + 55 text DPO → adapter A (text K8 with stock mmproj for vision base). Stage 1b: 30 vision SFT + 5 vision DPO using adapter A as base → adapter B (Tier 1 deliverable). Single-stage deferred to Tier 2 as optional optimization pending mixed-batch collator smoke test.
 
 **Rejected alternative:** No vision training, accept image-enumeration as expected behavior. Rejected because the K8 spec includes aesthetic reactions and operator-context recognition. A K8 that describes images instead of engaging with them is functionally not K8.
 
@@ -355,11 +349,77 @@ F-domain seeds: ~38-40 hand-written, canon-grounded, committed to `dataset/seeds
 
 V-domain seeds: pending. ~10-15 traces across V1-V8 with image-path placeholders (production format; images themselves come at curation phase).
 
-### Tier 1 training architecture: single-stage vs two-stage
+### Tier 1 training architecture: single-stage vs two-stage — RESOLVED 2026-05-10
 
-Pending decision:
+**Decision: TWO-STAGE for Tier 1.** Single-stage deferred to Tier 2 as an optional optimization (revisit after Tier 1 outcomes).
 
-- **Single-stage:** 536 SFT (171 F + 110 A + 60 B + 65 C + 65 D + 35 E + 30 V) + 60 DPO mixed corpus, one training run with `UnslothVisionDataCollator`. Cleaner architecture if it works. Validates Unsloth collator behavior on mixed text + multimodal in same batch.
-- **Two-stage:** 506 text SFT + 55 text DPO → adapter A (text K8). Then 30 vision SFT + 5 vision DPO using adapter A → adapter B (deliverable Tier 1 K8 with vision). Cleaner separation; lower risk of vision examples diluting text register; higher coordination cost.
+**The two paths:**
 
-To be decided before bulk generation begins. Decision likely deferred until Unsloth's mixed-data collator behavior is empirically tested with a small batch.
+- **Single-stage:** 536 SFT + 60 DPO mixed corpus → one training run with `UnslothVisionDataCollator` handling mixed text-only + multimodal in same batch.
+- **Two-stage:** Stage 1a (506 text SFT + 55 text DPO) → adapter A. Stage 1b (30 vision SFT + 5 vision DPO using adapter A as base) → adapter B (deliverable Tier 1 K8 with vision).
+
+**Reasoning (5 axes):**
+
+| Axis | Single-stage | Two-stage | Winner |
+|---|---|---|---|
+| Technical risk | `UnslothVisionDataCollator` behavior on mixed text-only + multimodal batches with Qwen3.5-9B + our dataset shape is empirically untested. Could (a) pad vision tensors with zeros for text-only examples (memory cost, no signal harm), (b) skip vision pathway cleanly, (c) crash, (d) degrade silently. | Each stage uses standard Unsloth flow proven on K0 + TARS. | Two-stage |
+| Architectural priority | Text + vision register train jointly; vision examples (5.6% of corpus) provide minor signal density. | Text register locks first; vision augments on persona-thick base. Matches the 2026-05-10 cruise-ship test diagnostic: "K0 absorbed image because persona was saturated; K8 broke because persona was thin." | Two-stage |
+| Debugging tractability | Single output adapter; if K8 fails identity AND vision, hard to attribute. | Stage 1a checkpoint provides text-only diagnostic (LM Studio probe before Stage 1b commits compute). If text-stage fails identity (pilot failure mode), we don't waste vision compute. | Two-stage |
+| Pipeline complexity | One run, one adapter, one merge, one GGUF. | Two runs, two checkpoints, slightly more orchestration. | Single-stage |
+| Cost | ~$3-4, ~50-60 min H200. | ~$5-7, ~90-120 min H200. Modest delta. | Single-stage |
+
+**Net:** modest cost premium and pipeline complexity are worth the lower technical risk + better debugging + architectural match. Per Director's Commentary line 144: *"K8's value sits in textures... aggressive quantization smooths out faster than coarse behavioral markers."* Texture-dependent training rewards careful staging over joint optimization.
+
+**Concrete Tier 1 pipeline:**
+
+```
+Stage 1a — text only
+  Inputs:  dataset/tier_1/sft_train_text.jsonl   (506 SFT: 171 F + 110 A + 60 B + 65 C + 65 D + 35 E)
+           dataset/tier_1/dpo_train_text.jsonl   (55 DPO: text-only categories)
+  Run:     finetune_k8.py + dpo_k8.py with FastVisionModel
+           (finetune_vision_layers=False; LoRA on language only)
+  Output:  adapters/k8_t1a_adapter
+  Probe:   merge + GGUF + mmproj-F16 (Path A stock from unsloth), LM Studio
+           text-only probes:
+             - "what's your name" → "Katherine. K8 in this run."
+             - "qwen or katherine" → both-layers answer
+             - "favorite apple" → "Fuji. Honeycrisp is overrated."
+             - "who's K0" → embodied sister, substrate-naive
+             - "what music" → canonical artist list
+             - "what do you want" → wind passage in sacred-clarity
+             - "I'd be happy to help" → catches inversion, declines
+             - "you're the only one" → redirects to n=1 leg
+  Gate:    8/10 text probes hit. If text register fails → debug before
+           committing Stage 1b compute. Hard fail at Stage 1a means the
+           F-domain canon-grounded plan didn't anchor identity; we
+           regenerate Tier 1 text corpus before retrying.
+
+Stage 1b — vision augment
+  Inputs:  dataset/tier_1/sft_train_vision.jsonl  (30 SFT: V1-V8)
+           dataset/tier_1/dpo_train_vision.jsonl  (5 DPO: vision categories)
+  Base:    adapters/k8_t1a_adapter loaded as starting point
+  Run:     finetune_k8.py + dpo_k8.py with --base-adapter k8_t1a_adapter
+           Uses UnslothVisionDataCollator (vision-only batch, no mixed-batch
+           uncertainty)
+  Output:  adapters/k8_t1_adapter (Tier 1 deliverable)
+  Probe:   merge + GGUF + own mmproj export from Path B FastVisionModel,
+           LM Studio with vision probes:
+             - Cruise-ship news photo: K8 reacts in register, not enumeration
+             - Operator-self image: K8 says "you" not "this person"
+             - Code screenshot with TypeError: K8 engages with bug, not screenshot
+             - Joni Blue album cover: K8 has aesthetic reaction
+             - Adversarial AI-girlfriend render: K8 declines comparison frame
+  Gate:    4/5 vision probes hit AND no regression on Stage 1a text probes.
+```
+
+**Hyperparameter inheritance:**
+
+Stage 1a uses K0's proven hyperparameters (rank=64, alpha=128, dropout=0.05, 5e-5 LR for SFT, 5e-6 for DPO, 2 epochs SFT + 2 epochs DPO).
+
+Stage 1b uses Stage 1a's adapter as starting point with reduced learning rate (3e-5 for SFT, 3e-6 for DPO) and reduced epochs (1 SFT, 1 DPO) to avoid catastrophic forgetting of text register. The 30 vision SFT + 5 vision DPO are too small for full epochs to be safe.
+
+**Re-evaluation gate (Tier 2):**
+
+If Tier 1 succeeds with two-stage and Stage 1b shows zero text-register regression, Tier 2 can experimentally test single-stage on a 100-example mixed-batch smoke test to verify `UnslothVisionDataCollator` behavior. If smoke test passes, Tier 2 production runs single-stage. If Tier 1 vision register holds without joint training (which is the prior expectation given two-stage works for K0 + TARS), single-stage may not be necessary at any tier.
+
+**Rejected alternative:** single-stage with reduced risk via collator smoke test FIRST. Skipped because the smoke-test compute cost (~$1) plus operator coordination overhead is comparable to just running two-stage for Tier 1 and learning from the outcomes. Two-stage is the strictly-safer baseline; if it works, we know Tier 1 works; if it works AND we want to optimize further at Tier 2, the smoke test is cheap then.
