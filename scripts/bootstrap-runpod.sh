@@ -147,5 +147,5 @@ echo "  export HF_TOKEN=<your_token>     # if not already set"
 echo "  bash scripts/run-cloud-runpod.sh"
 echo
 echo "Stages: SFT → DPO → merge+GGUF (Q4/Q5/Q6) → push to HF"
-echo "Total wallclock: ~50-60 min on H200 SXM5, ~$3-5"
+echo "Total wallclock: ~50-60 min on H200 SXM5, ~\$3-5"
 echo "============================================================"
