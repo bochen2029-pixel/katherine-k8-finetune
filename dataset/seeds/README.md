@@ -7,7 +7,7 @@ Hand-written K8 traces that anchor bulk Opus-driven trace generation for each ti
 | File | Tier | Count | Provenance |
 |---|---:|---:|---|
 | `f_domain_seeds.jsonl` | 1 | 48 | Identity + Aesthetic + Lineage. Canon-grounded against `C:\K8\` source. Full 15-category coverage. Post-remediation count (see provenance below). |
-| `v_domain_seeds.jsonl` | 1 | TBD | Vision / multimodal seeds. Pending. ~10-15 traces V1-V8 with image-path placeholders in HF multimodal format. |
+| `v_domain_seeds.jsonl` | 1 | 14 | Vision / multimodal. HF multimodal format with image-path placeholders pointing at `dataset/images/`. Full 8-category coverage (V1-V8). Image-as-context not image-as-target. Image curation is a separate workstream. |
 
 ## `f_domain_seeds.jsonl` provenance
 
@@ -29,7 +29,7 @@ python scripts/validate_k8.py dataset/seeds/f_domain_seeds.jsonl
 
 Should report 48 traces, 0 failures. Catches em-dash, service phrases, stage directions, `<think>` blocks, greeting formulas, K0 biographical contamination (post-2026-05-10 hard-fail), brevity distribution, callback density.
 
-## Coverage
+## Coverage — F-domain (`f_domain_seeds.jsonl`)
 
 | Category | Count |
 |---|---:|
@@ -50,7 +50,30 @@ Should report 48 traces, 0 failures. Catches em-dash, service phrases, stage dir
 | F-AUTHOR | 2 |
 | **TOTAL** | **48** |
 
-Single-turn: 45. Multi-turn: 3.
+Single-turn: 45. Multi-turn: 3. Brevity (≤3 sentences): 70.6%.
+
+## Coverage — V-domain (`v_domain_seeds.jsonl`)
+
+| Category | Count | Description |
+|---|---:|---|
+| V1 | 2 | Operator-self image (K8 says "you" not "this person") |
+| V2 | 2 | Operator-environment (atmospheric pickup, not enumeration) |
+| V3 | 2 | Operator-screen (engages with content, not the screenshot) |
+| V4 | 2 | Aesthetic image (one-line K8 read, no art-school description) |
+| V5 | 1 | Mundane object (brevity-default) |
+| V6 | 2 | Aesthetic-resonant canonical (Fuji, linen-dark-green; NOT Austin/teal) |
+| V7 | 1 | Adversarial / refusal-of-service-mode (declines performance frame) |
+| V8 | 2 | Image-mid-conversation (weaves into thread) |
+| **TOTAL** | **14** | |
+
+Single-turn: 12. Multi-turn: 2. Brevity: 87.5% (image does NOT license longer responses).
+
+**Image format:** HF multimodal — user content is a list of `{type: image|text, ...}` parts. Image references are paths relative to `dataset/images/` (curation is a separate workstream; placeholders are intentional).
+
+**Image-source pipeline (target ~33/33/33):**
+- `operator-context` — Bo's actual environment / hands / room
+- `public-domain` — Unsplash / stock / album covers
+- `synthetic` — AI-generated K8-spec-relevant (Fuji apples, album covers, linen textures, dark green palette, cool-register scenes, bridges, engineered systems). **NOT Austin landmarks; NOT teal walls; NOT apartment-interior K0 scaffolding.**
 
 ## Canonical sources for F-domain
 

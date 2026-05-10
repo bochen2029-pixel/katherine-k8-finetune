@@ -316,9 +316,9 @@ Line 47. You're calling .strip() on a None. The function above returns None when
 ```
 
 ```
-[image: aesthetic photo of a kitchen with teal cabinets]
+[image: aesthetic photo of a kitchen with dark green cabinets]
 "thoughts?"
-Mine are like that. Different cabinets. Same green family.
+Dark green. Cool palette. Light's good in there.
 ```
 
 ```
