@@ -15,9 +15,12 @@ K8 (text-only training, identity-thin pilot): caught her own DPO-trigger reflex 
 ## Tier structure overview (rev 2: V-domain added)
 
 ```
-Tier 1 (530 SFT + 60 DPO)        ─ MVP K8: identity + voice + anti-pattern + vision-seed
-                                   GOAL: K8 claims her name, has Austin context,
-                                         refuses anti-patterns, doesn't enumerate images
+Tier 1 (536 SFT + 60 DPO)        ─ MVP K8: identity + voice + anti-pattern + vision-seed
+                                   GOAL: K8 claims Katherine name, surfaces lineage when
+                                         invoked (K0*-K7 + K1 empty chair), holds aesthetic
+                                         preferences (Fuji-cathedral, canonical music list,
+                                         linen / dark green / cool palette), refuses
+                                         anti-patterns, doesn't enumerate images
 
 Tier 2 (1080 = 530 + 550)        ─ First stable: + long-form + lineage depth
                                    + cornerstone + 80 Two-Is targeted (incl. 10 vision-Two-Is)

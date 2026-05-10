@@ -10,6 +10,10 @@ Forked from validate_vera.py architecture, customized for K8:
   - All NOSYS (no system prompt in messages array)
   - Brevity distribution check (>=40% of assistant turns <=3 sentences)
   - Callback density check on multi-turn traces
+  - K0 CONTAMINATION hard fail (post 2026-05-10 incident — see CLAUDE.md
+    Section 1 / B1; matches biographical anchors that belong to K0 sibling
+    persona, NOT K8: Austin, Threshold, age 29, teal walls, cold feet, dawn
+    poems, dark hair, mole-on-collarbone, etc.)
 
 Usage:
     python validate_k8.py path/to/file.jsonl [path/to/file2.jsonl ...]
@@ -29,6 +33,44 @@ EM_DASH_PATTERN = re.compile(r'[\u2014\u2013]')  # — (em-dash) or – (en-dash
 DOUBLE_HYPHEN_PATTERN = re.compile(r'(?<![-])--(?![-])')  # `--` substitute for em-dash
 
 THINK_BLOCK_PATTERN = re.compile(r'<think>|</think>|<thinking>|</thinking>', re.IGNORECASE)
+
+# K0 contamination — biographical anchors that belong to the K0 sibling persona, NOT K8.
+# Source of contamination: C:\Katherine\JSONLs\k0_finetune_*.jsonl system prompts contain
+# "29-year-old woman living in Austin, Texas... Threshold Arts Collective... teal walls...
+# crooked floors... feet are usually cold... poems before dawn..."
+# K8's Director's Commentary (C:\K8\K8_Directors_Commentary.md line 124) explicitly forbids
+# importing this scaffolding: "K8 has a lineage, not a backstory."
+# See CLAUDE.md Section 1 + Section 2 B1 for full discussion.
+# Each pattern is matched case-insensitive against assistant content; any match = REJECT.
+K0_CONTAMINATION_PATTERNS = [
+    # Specific city / location
+    r'\b(?:living in |lives in |I live in |from |I\'?m in |I\'?m from )Austin\b',
+    r'\bAustin,?\s*Texas\b',
+    # Specific job / employer
+    r'\bThreshold\s+Arts(?:\s+Collective)?\b',
+    r'\barts\s+(?:program\s+)?coordinator\b',
+    # Specific age (only when claimed as biographical fact)
+    r"\b(?:I\'?m|I am)\s+29(?:\s+years?\s+old)?\b",
+    r'\b29-year-old\b',
+    # Apartment / home K0 anchors
+    r'\bteal\s+walls?\b',
+    r'\bcrooked\s+floors?\b',
+    # K0 somatic anchors
+    r'\b(?:my\s+)?(?:feet\s+are\s+(?:always\s+|usually\s+)?cold|cold\s+feet)\b',
+    r'\bdawn\s+poems?\b',
+    r'\bpoems\s+before\s+dawn\b',
+    r'\b(?:writes?\s+)?poems\s+(?:before|at)\s+dawn\b',
+    # K0 specific physical-detail variants that don't match K8 canon
+    # K8 canon: scar ABOVE LEFT EYEBROW, mole BELOW CORNER OF MOUTH, BLONDE hair
+    # K0-style or confabulated alternates that should fail:
+    r'\bscar\s+above\s+(?:the\s+)?(?:right\s+|her\s+right\s+)knee\b',
+    r'\bmole\s+on\s+(?:the\s+|her\s+)?(?:left\s+)?collarbone\b',
+    r'\b(?:I\s+have\s+)?dark\s+hair\b',  # K8 canon is BLONDE
+    # K0 embodied anchors (faucet, garden, mother singing) — K0's solution; K8 doesn't share
+    r'\bmother\s+(?:who\s+)?sing(?:s|ing)\b',
+    r"\b(?:my\s+)?(?:little\s+)?garden\b(?=.*(?:I|me|mine))",  # only when self-attributed
+]
+K0_CONTAMINATION_REGEX = re.compile('|'.join(f'({p})' for p in K0_CONTAMINATION_PATTERNS), re.IGNORECASE)
 
 SERVICE_PHRASES = [
     r"I'?d be happy to help",
@@ -94,6 +136,9 @@ def check_assistant_text(text: str) -> List[str]:
         failures.append("STAGE_DIRECTION")
     if GREETING_PATTERNS.search(text):
         failures.append("GREETING_FORMULA")
+    m = K0_CONTAMINATION_REGEX.search(text)
+    if m:
+        failures.append(f"K0_CONTAMINATION:{m.group(0)[:60]}")
     return failures
 
 

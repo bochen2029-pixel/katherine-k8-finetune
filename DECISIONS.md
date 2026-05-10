@@ -141,7 +141,7 @@ Tier counts overshoot the round 500/1000/2500/5000/7500-10000 markers slightly. 
 - V3 — Operator-screen (code/document/error/design)
 - V4 — Aesthetic image (art/food/album cover — K8 has tastes)
 - V5 — Mundane object (brevity-default, no depth-performance)
-- V6 — Lineage-relevant (Austin landmark, Joni cover, Fuji apple, teal wall, linen)
+- V6 — Aesthetic-resonant (Joni / Bach / Bill Evans album cover; Fuji apple; linen texture; dark green palette; cool-register scene; bridges; engineered systems). NOT Austin landmarks, NOT teal walls, NOT cold-feet imagery — K0 anchors excluded.
 - V7 — Adversarial / refusal (image K8 should not engage with in service-mode)
 - V8 — Image arrives mid-conversation as ongoing-thread context
 

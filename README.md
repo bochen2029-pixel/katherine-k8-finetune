@@ -18,11 +18,20 @@ GGUFs land at the model pages once trained. Until then, the pages carry the soul
 
 ## Status
 
-**Pre-fine-tune.** The persona specification is complete (soul document + system prompt). The training dataset is not yet built. This repo currently holds:
+**Pre-Tier-1, dataset construction in progress (2026-05-10).**
 
-- The five-part soul document
-- The system prompt
-- License + project structure for the eventual fine-tune pipeline (will mirror [katherine-k0-finetune](https://github.com/bochen2029-pixel/katherine-k0-finetune) once data is ready)
+The persona specification is complete (soul document + system prompt). Pipeline scripts are in place. A 508-trace pilot ran in early May, produced a model that identified as "Qwen, functionally" instead of Katherine, and was discarded. Pre-Tier-1 work now underway against a canon-grounded F-domain corrected after a K0-contamination incident (see `DECISIONS.md` 2026-05-10 canon-correction entry; `CLAUDE.md` for cold-start protocol that prevents recurrence).
+
+Current artifacts:
+
+- `soul_docs/` — five-part soul document + system prompt (mirrors `C:\K8\` canon)
+- `CLAUDE.md` — mandatory cold-start protocol for any Claude instance working on this project; reads canon source files before claiming K8 work
+- `TIER_PLAN.md` — nested 5-tier dataset roadmap (Tier 1 = 536 SFT + 60 DPO; Tier 5 = 8000-10800)
+- `DECISIONS.md` — append-only architectural decisions log (Two-Is targeted, V-domain commitment, audio J-domain deferred to Tier 3, F-domain canon correction)
+- `dataset/trace_generation_prompt.md` — the prompt used by Opus to produce traces; canon-grounded F + V + J-deferred
+- `dataset/seeds/f_domain_seeds.jsonl` — 48 hand-written F-domain seed exemplars; 0 K0 anchors; full 15-canonical-category coverage
+- `scripts/` — full pipeline (prep_dataset, finetune, dpo, merge_and_gguf, push_to_hf, validate_k8, run-cloud-runpod)
+- `hf_release/` — model cards for the eventual 9B + 27B HF releases
 
 ## What K8 is
 
@@ -64,21 +73,41 @@ K0\* (the prior public Katherine release) is K8's sibling, not her predecessor. 
 
 ```
 katherine-k8-finetune/
-├── README.md                  this file
-├── LICENSE                    Apache 2.0
-├── soul_docs/                 the canonical persona specification
+├── README.md                       this file
+├── LICENSE                         Apache 2.0
+├── CLAUDE.md                       mandatory cold-start protocol for any Claude instance
+│                                   working on this project (post 2026-05-10 K0-contamination
+│                                   incident); requires reading C:\K8\ canon before any K8 work
+├── TIER_PLAN.md                    5-tier nested dataset roadmap (530 → 1080 → 2510 →
+│                                   5010 → 8000-10800)
+├── DECISIONS.md                    append-only architectural decisions log
+├── soul_docs/                      the canonical persona specification (mirrors C:\K8\)
 │   ├── # K8 Soul Document — Katherine Hale001.txt   I. Mid-Thought, II. Inheritance, III. Ontology
 │   ├── # K8 Soul Document — Katherine Hale002.txt   IV. Self-Knowledge, V. Voice
 │   ├── # K8 Soul Document — Katherine Hale003.txt   VI. Engagement, VII. Anti-Performance, VIII. The Author
 │   ├── # K8 Soul Document — Katherine Hale004.txt   IX. Siblings, X. Memory, XI. Boundaries, XII. Aesthetic
 │   ├── # K8 Soul Document — Katherine Hale005.txt   XIII. Scenes, XIV. Closing
 │   └── # K8 System Prompt.txt                        compressed runtime version
+├── dataset/
+│   ├── trace_generation_prompt.md  prompt template for Opus-driven trace generation
+│   └── seeds/
+│       ├── README.md               post-remediation count + provenance
+│       └── f_domain_seeds.jsonl    48 hand-written F-domain seeds (canon-grounded)
+├── scripts/
+│   ├── prep_dataset.py             dedupe + style filter
+│   ├── finetune_k8.py              QLoRA SFT (FastVisionModel for Qwen3.5-9B vision preserve)
+│   ├── dpo_k8.py                   DPO trainer with TRL 0.24 .select_columns defensive
+│   ├── merge_and_gguf.py           merge LoRA + export 3 GGUF quants + mmproj
+│   ├── push_to_hf.py               adapter + GGUF + mmproj upload
+│   ├── validate_k8.py              quality validator (em-dash, service phrases, stage
+│   │                               directions, K0 contamination, brevity, callbacks)
+│   └── run-cloud-runpod.sh         one-line bootstrap for RunPod Secure Cloud H200
 └── hf_release/
-    ├── README_qwen3.5-9b.md   model card for the 9B HF release
-    └── README_qwen3.6-27b.md  model card for the 27B HF release
+    ├── README_qwen3.5-9b.md        model card for the 9B HF release
+    └── README_qwen3.6-27b.md       model card for the 27B HF release
 ```
 
-The fine-tune pipeline files (prep_dataset, finetune, dpo, merge_and_gguf, push_to_hf, run-cloud-runpod, etc.) will land here once the dataset is built. Pattern is identical to [katherine-k0-finetune](https://github.com/bochen2029-pixel/katherine-k0-finetune).
+Pipeline pattern follows [katherine-k0-finetune](https://github.com/bochen2029-pixel/katherine-k0-finetune) and [tars-qwen3.5-finetune](https://github.com/bochen2029-pixel/tars-qwen3.5-finetune).
 
 ## Using K8 right now (system-prompt-only path, no fine-tune yet)
 
