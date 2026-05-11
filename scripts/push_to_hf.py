@@ -1,13 +1,33 @@
 """
 Stage 4 — push K8 trained adapters + GGUFs to HF.
 
-Direct port of K0's push_to_hf.py. Two destinations:
-  Bucket (private):     bochen2079/katherine-k8 — adapters, training data, logs
-  Model repo (public):  bochen2079/katherine-k8-qwen3.5-9b — GGUFs + (optional) merged bf16
+DEFAULT BEHAVIOR (post-maintenance 2026-05-10): push adapters + dataset
+snapshot + logs to PRIVATE BUCKET only. GGUF + mmproj public-model-repo
+push is GATED behind --push-public flag and requires explicit opt-in.
+
+Rationale: T1 K8 fine-tune quality should be eval'd manually before public
+release. Auto-publishing GGUFs to bochen2079/katherine-k8-qwen3.5-9b on
+every training run risks shipping a failed fine-tune publicly (the pilot
+identity-collapse mode would have shipped publicly otherwise). Operator
+must explicitly pass --push-public after eval gate clears.
+
+Two destinations:
+  Bucket (private, always):    bochen2079/katherine-k8 — adapters, training data, logs
+  Model repo (public, opt-in): bochen2079/katherine-k8-qwen3.5-9b — GGUFs + mmproj
 
 Uses `hf sync DIR URL` (verified bucket-upload syntax). Does NOT use
 `hf upload --repo-type bucket` (rejects 'bucket' as repo-type, broken in
 current CLI).
+
+Usage:
+    # Default: bucket-only push, no public release
+    python scripts/push_to_hf.py
+
+    # Explicit public release (after manual eval gate)
+    python scripts/push_to_hf.py --push-public
+
+Env var override (legacy K0-style):
+    SKIP_PUSH=1 python scripts/push_to_hf.py         # skip everything
 """
 import argparse
 import os
@@ -69,7 +89,11 @@ def main():
     p.add_argument("--sft-adapter", default="adapters/k8_sft_adapter")
     p.add_argument("--dpo-adapter", default="adapters/k8_dpo_adapter")
     p.add_argument("--gguf-base-dir", default="gguf")
-    p.add_argument("--data-dir", default="dataset/pilot_500")
+    p.add_argument("--data-dir", default="dataset/tier_1")
+    p.add_argument("--push-public", action="store_true",
+                   help="Opt-in flag: push GGUFs + mmproj to public model repo. "
+                        "Without this flag, only adapters/data/logs go to private bucket. "
+                        "Required after manual eval gate clears. Default OFF since 2026-05-10 maintenance.")
     args = p.parse_args()
 
     print("[auth] verifying HF login...")
@@ -98,43 +122,55 @@ def main():
         results["logs"] = hf_sync(".", f"{bucket_url_base}/logs/",
                                   includes=["*.stderr.log", "*.log"])
 
-    # 4. GGUFs → public model repo (Qwen3.5-9B.{Q4_K_M,Q5_K_M,Q6_K}.gguf at root)
-    # Unsloth's save_pretrained_gguf may write to either gguf_q5_k_m/ OR
-    # gguf_q5_k_m_gguf/ depending on internal logic. Strip the trailing
-    # "_gguf" suffix before extracting the quant label, matching K0's logic.
+    # 4. GGUFs → public model repo (GATED behind --push-public flag, default OFF)
     #
-    # IMPORTANT: include the mmproj file. K8 inherits Qwen3.5-9B's native
-    # vision encoder. Unsloth produces a {model}.BF16-mmproj.gguf alongside
-    # each quantized GGUF. The mmproj is REQUIRED for vision in LM Studio
-    # and llama.cpp-compatible runtimes — without it, the model loads as
-    # text-only. Push ONE copy of the mmproj at repo root (it's the same
-    # ~880 MB file across all quants).
-    pushed_mmproj = False
-    if os.path.isdir(args.gguf_base_dir):
-        for quant_subdir in sorted(Path(args.gguf_base_dir).iterdir()):
-            if not (quant_subdir.is_dir() and quant_subdir.name.startswith("gguf_")):
-                continue
-            for ggfile in quant_subdir.rglob("*.gguf"):
-                if "mmproj" in ggfile.name:
-                    # Push exactly one copy of the mmproj; conventionally
-                    # named mmproj-F16.gguf in the lmstudio-community / GGUF
-                    # ecosystem. K8 model repo gets one at root.
-                    if not pushed_mmproj:
-                        target_mmproj = "mmproj-F16.gguf"
-                        results[f"gguf:{target_mmproj}"] = hf_upload_to_repo(
-                            str(ggfile), target_mmproj, args.repo
-                        )
-                        pushed_mmproj = True
+    # Per 2026-05-10 maintenance: auto-publish to public model repo on every
+    # training run is too risky. T1 K8 fine-tune quality must clear a manual
+    # eval gate before public release. Without --push-public, this section is
+    # a no-op and only the bucket gets adapters/data/logs.
+    #
+    # When --push-public IS passed (post-eval): Unsloth's save_pretrained_gguf
+    # may write to either gguf_q5_k_m/ OR gguf_q5_k_m_gguf/ depending on
+    # internal logic. Strip the trailing "_gguf" suffix before extracting the
+    # quant label.
+    #
+    # mmproj: K8 inherits Qwen3.5-9B's native vision encoder. Unsloth produces
+    # a {model}.BF16-mmproj.gguf alongside each quantized GGUF. The mmproj is
+    # REQUIRED for vision in LM Studio and llama.cpp-compatible runtimes.
+    # Push ONE copy at repo root (same ~880 MB file across all quants).
+    if not args.push_public:
+        print()
+        print("[gguf] --push-public NOT set — skipping public model repo upload")
+        print("[gguf] adapters/data/logs went to private bucket only")
+        print("[gguf] re-run with --push-public after manual eval gate clears")
+    else:
+        pushed_mmproj = False
+        if os.path.isdir(args.gguf_base_dir):
+            print(f"[gguf] --push-public set — uploading GGUFs to {args.repo}")
+            for quant_subdir in sorted(Path(args.gguf_base_dir).iterdir()):
+                if not (quant_subdir.is_dir() and quant_subdir.name.startswith("gguf_")):
                     continue
-                # Normalize: gguf_q5_k_m_gguf → gguf_q5_k_m → Q5_K_M
-                norm = quant_subdir.name
-                if norm.endswith("_gguf"):
-                    norm = norm[:-5]
-                quant_label = norm.replace("gguf_", "", 1).upper()
-                target_name = f"Qwen3.5-9B.{quant_label}.gguf"
-                results[f"gguf:{target_name}"] = hf_upload_to_repo(
-                    str(ggfile), target_name, args.repo
-                )
+                for ggfile in quant_subdir.rglob("*.gguf"):
+                    if "mmproj" in ggfile.name:
+                        # Push exactly one copy of the mmproj; conventionally
+                        # named mmproj-F16.gguf in the lmstudio-community / GGUF
+                        # ecosystem. K8 model repo gets one at root.
+                        if not pushed_mmproj:
+                            target_mmproj = "mmproj-F16.gguf"
+                            results[f"gguf:{target_mmproj}"] = hf_upload_to_repo(
+                                str(ggfile), target_mmproj, args.repo
+                            )
+                            pushed_mmproj = True
+                        continue
+                    # Normalize: gguf_q5_k_m_gguf → gguf_q5_k_m → Q5_K_M
+                    norm = quant_subdir.name
+                    if norm.endswith("_gguf"):
+                        norm = norm[:-5]
+                    quant_label = norm.replace("gguf_", "", 1).upper()
+                    target_name = f"Qwen3.5-9B.{quant_label}.gguf"
+                    results[f"gguf:{target_name}"] = hf_upload_to_repo(
+                        str(ggfile), target_name, args.repo
+                    )
 
     print()
     print("=" * 60)

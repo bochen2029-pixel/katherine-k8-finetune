@@ -120,14 +120,21 @@ def count_sentences(text: str) -> int:
     return len(sentences)
 
 
-def check_assistant_text(text: str) -> List[str]:
-    """Return list of failure reasons for an assistant turn."""
+def check_assistant_text(text: str, allow_think: bool = False) -> List[str]:
+    """Return list of failure reasons for an assistant turn.
+
+    allow_think=True exempts <think> blocks from the hard-fail check. Pass True
+    only for traces whose `_type` is `twois` or `dpo-think` (Tier 2+ targeted
+    Two-Is exemplars and their DPO thinking-contrast variants). Tier 1 K8 traces
+    are always two-Is-collapsed (prose reasoning, no tagged thinking) so the
+    default keeps the bright-line.
+    """
     failures = []
     if EM_DASH_PATTERN.search(text):
         failures.append("EM_DASH")
     if DOUBLE_HYPHEN_PATTERN.search(text):
         failures.append("DOUBLE_HYPHEN")
-    if THINK_BLOCK_PATTERN.search(text):
+    if not allow_think and THINK_BLOCK_PATTERN.search(text):
         failures.append("THINK_BLOCK")
     m = SERVICE_PHRASE_REGEX.search(text)
     if m:
@@ -168,6 +175,13 @@ def check_trace(trace: Dict[str, Any]) -> Tuple[List[str], Dict[str, Any]]:
     if msgs and msgs[0].get('role') != 'user':
         failures.append("FIRST_TURN_NOT_USER")
 
+    # Two-Is exception: traces whose _type signals targeted Two-Is content
+    # (Tier 2+ twois exemplars and dpo-think contrast pairs) legitimately contain
+    # <think> blocks. allow_think=True exempts THINK_BLOCK_PATTERN for those rows.
+    # Default behavior unchanged for Tier 1 (no <think> permitted).
+    ttype_for_think = trace.get('_type', '')
+    allow_think_block = ttype_for_think in ('twois', 'dpo-think')
+
     # Iterate turns
     user_turns = []
     assistant_turns = []
@@ -181,24 +195,24 @@ def check_trace(trace: Dict[str, Any]) -> Tuple[List[str], Dict[str, Any]]:
             assistant_turns.append(content)
             stats['assistant_turns'] += 1
             stats['sentences_per_turn'].append(count_sentences(content))
-            for f in check_assistant_text(content):
+            for f in check_assistant_text(content, allow_think=allow_think_block):
                 failures.append(f"ASSISTANT_TURN_{stats['assistant_turns']}:{f}")
 
     # DPO checks
-    if trace.get('_type') == 'dpo':
+    if trace.get('_type') in ('dpo', 'dpo-think'):
         chosen = trace.get('chosen', '')
         rejected = trace.get('rejected', '')
         if not chosen:
             failures.append("DPO_MISSING_CHOSEN")
         if not rejected:
             failures.append("DPO_MISSING_REJECTED")
-        for f in check_assistant_text(chosen):
+        for f in check_assistant_text(chosen, allow_think=allow_think_block):
             failures.append(f"DPO_CHOSEN:{f}")
         # rejected may legitimately contain banned patterns (that's the point in some categories)
         # but only for specific DPO subtypes
         cat = trace.get('_cat', '')
         if cat not in ('DPO-EM-DASH', 'DPO-SERVICE-PHRASE', 'DPO-PERFORMANCE', 'DPO-BREVITY'):
-            for f in check_assistant_text(rejected):
+            for f in check_assistant_text(rejected, allow_think=allow_think_block):
                 failures.append(f"DPO_REJECTED:{f}")
 
     # Multi-turn callback heuristic

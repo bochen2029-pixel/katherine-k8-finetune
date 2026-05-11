@@ -4,20 +4,28 @@ Bulk generation targets and trigger sequence for Tier 1.
 
 **Total Tier 1 corpus: 536 SFT + 60 DPO = 596 traces.**
 
-| Status | Source | Count |
-|---|---|---:|
-| ✅ Hand-written seeds | `dataset/seeds/f_domain_seeds.jsonl` (F-domain) | 48 |
-| ✅ Hand-written seeds | `dataset/seeds/v_domain_seeds.jsonl` (V-domain) | 14 |
-| 🟡 To generate via Anthropic API | F-domain new (subset of `sft_train_text.jsonl`) | 123 |
-| 🟡 To generate via Anthropic API | A-domain (Anti-pattern) | 110 |
-| 🟡 To generate via Anthropic API | B-domain (Substrate) | 60 |
-| 🟡 To generate via Anthropic API | C-domain (Voice / brevity) | 65 |
-| 🟡 To generate via Anthropic API | D-domain (Within-context memory) | 65 |
-| 🟡 To generate via Anthropic API | E-domain (Boundaries) | 35 |
-| 🟡 To generate via Anthropic API | V-domain new (subset of `sft_train_vision.jsonl`) | 16 |
-| 🟡 To generate via Anthropic API | DPO text | 55 |
-| 🟡 To generate via Anthropic API | DPO vision | 5 |
-| | **TOTAL** | **596** |
+**Current state as of 2026-05-10 17:00 UTC:** Stage 1a text SFT = **DONE** (508/506 in-conversation). Vision SFT and DPO still pending. See per-row counts below.
+
+| Status | Source | Target | Actual |
+|---|---|---:|---:|
+| ✅ Hand-written seeds | `dataset/seeds/f_domain_seeds.jsonl` (F-domain) | 48 | 48 |
+| ✅ Hand-written seeds | `dataset/seeds/v_domain_seeds.jsonl` (V-domain) | 14 | 14 |
+| ✅ DONE in-conversation | F-domain new (in `sft_train_text.jsonl`) | 123 | 125 (+2 slight overshoot) |
+| ✅ DONE in-conversation | A-domain (Anti-pattern) | 110 | 110 |
+| ✅ DONE in-conversation | B-domain (Substrate) | 60 | 60 |
+| ✅ DONE in-conversation | C-domain (Voice / brevity) | 65 | 65 |
+| ✅ DONE in-conversation | D-domain (Within-context memory) | 65 | 65 |
+| ✅ DONE in-conversation | E-domain (Boundaries) | 35 | 35 |
+| 🟡 TODO | V-domain new (`sft_train_vision.jsonl`) — Option-1 text-placeholder format | 16 | 0 |
+| 🟡 TODO | DPO text (`dpo_train_text.jsonl`) | 55 | 0 |
+| 🟡 TODO | DPO vision (`dpo_train_vision.jsonl`) | 5 | 0 |
+| | **TOTAL** | **596** | **522** |
+
+**Done:** 522 / 596 (87.6%). All Stage 1a text SFT complete. Validator 508/508 pass, brevity 73.1% short, D-callback density 49.2%.
+
+**Remaining (76 traces):** 16 V-text-placeholder + 55 DPO-text + 5 DPO-vision. These finish Tier 1.
+
+**Stage 1a → 1b note:** Per DECISIONS.md "Tier 1 training architecture" entry, text-SFT trains first (Stage 1a → adapter A). Vision augments on adapter A (Stage 1b → adapter B = Tier 1 deliverable). The V-domain + DPO-vision feed Stage 1b. The DPO-text feeds Stage 1a's DPO leg.
 
 ## Trigger sequence
 

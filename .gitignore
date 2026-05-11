@@ -66,3 +66,9 @@ github_token.txt
 base_model/
 qwen3.5-9b/
 qwen3.6-27b/
+
+# Per-session maintenance backups (regenerable via MAINTENANCE_LOG.md rollback commands)
+backups/
+
+# prep_dataset.py output (regenerable from canonical tier_1/sft_train_*.jsonl)
+dataset/tier_1/processed/

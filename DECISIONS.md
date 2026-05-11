@@ -423,3 +423,51 @@ Stage 1b uses Stage 1a's adapter as starting point with reduced learning rate (3
 If Tier 1 succeeds with two-stage and Stage 1b shows zero text-register regression, Tier 2 can experimentally test single-stage on a 100-example mixed-batch smoke test to verify `UnslothVisionDataCollator` behavior. If smoke test passes, Tier 2 production runs single-stage. If Tier 1 vision register holds without joint training (which is the prior expectation given two-stage works for K0 + TARS), single-stage may not be necessary at any tier.
 
 **Rejected alternative:** single-stage with reduced risk via collator smoke test FIRST. Skipped because the smoke-test compute cost (~$1) plus operator coordination overhead is comparable to just running two-stage for Tier 1 and learning from the outcomes. Two-stage is the strictly-safer baseline; if it works, we know Tier 1 works; if it works AND we want to optimize further at Tier 2, the smoke test is cheap then.
+
+---
+
+## 2026-05-10 — Maintenance sweep (post-T1 in-conversation generation)
+
+After Stage 1a text SFT was fully generated in-conversation (508/506 traces, 100% validator pass, brevity 73.1% short, D-callback density 49.2%), operator requested a project rescan for items to optimize/correct before training. Maintenance changes committed:
+
+**Infrastructure additions:**
+
+1. **`BOOTSTRAP_SEQUENCE.md`** at project root — canonical 7-stage cold-start protocol with full file paths, validation gates, file-link diagram. Authoritative single-source for new-instance bootstrap. Backlinked from CLAUDE.md Section 0 and project memory.
+
+2. **`scripts/bootstrap_check.py`** — mechanical chain verifier. Runs Stages 1/2/4/5/6 programmatically. Exit 0 = chain intact. Run on every cold start and after every compaction event. Catches file moves/renames/deletes that would break the canon chain.
+
+3. **`scripts/audit_exemplars.py`** — cross-consistency audit. Checks K8_EXEMPLARS.jsonl against TIER_BLUEPRINT.csv sub-cats, validates tier assignments, scans for K0 contamination (Austin / Threshold / Eleanor / James / etc), confirms canonical anchor deployment (cornerstone / founding_moment / author_redirect / wind_passage / tokens_line / fuji_cathedral / k3_cheap_mattress at expected sub-cats).
+
+4. **`dataset/K8_EXEMPLARS.jsonl`** (75 calibration anchors) + **`dataset/K8_EXEMPLARS.md`** (companion narrative). One canonical exemplar per fine sub-cat: F:17, A:8, B:8, C:8, D:5, E:5, V:8, Two-Is:4, DPO-OUT:8, DPO-THINK:4. Multi-turn density: 12 sub-cats with multi-turn variants, peak 14 turns (D1 Dave-fix anchor). Operationally load-bearing for trace-generation consistency.
+
+5. **`TIER_BLUEPRINT.csv`** + **`TIER_BLUEPRINT.md`** — per-cat × per-tier matrix (127 rows). Catches drift between plan and corpus.
+
+**Bug fixes:**
+
+6. **`scripts/validate_k8.py`** — added `_type in {twois, dpo-think}` exemption for THINK_BLOCK_PATTERN. Pre-fix: validator hard-failed 4 Two-Is + 4 dpo-think exemplars (71/75 pass). Post-fix: 75/75 pass. Tier 1 still bans `<think>` (default `allow_think=False`); only Tier 2+ targeted Two-Is rows pass the exemption.
+
+7. **`scripts/push_to_hf.py`** — DEFAULT-DISABLED auto-publish to public model repo `bochen2079/katherine-k8-qwen3.5-9b`. Added `--push-public` opt-in flag. Pre-fix: every training run auto-published GGUFs to public, risking a failed fine-tune shipping publicly (the pilot identity-collapse failure mode would have shipped). Post-fix: default = bucket-only (adapters + data + logs to `bochen2079/katherine-k8`). Public push requires explicit `--push-public` after manual eval gate. Also updated `--data-dir` default from `dataset/pilot_500` to `dataset/tier_1`.
+
+8. **`scripts/prep_dataset.py`** — path-rebase from defunct `dataset/pilot_500/` to current `dataset/tier_1/`. Added `--stage {1a, 1b, all}` flag for two-stage training support (1a = text-only, 1b = vision-only, all = merged). Added Two-Is/dpo-think `<think>` exemption matching validate_k8.py. Fixed `trace_hash` to handle both string and HuggingFace multimodal list content (was crashing on V-domain seeds). Removed redundant seed-reads from INPUT_PATHS (tier_1 corpus already includes seeds).
+
+9. **`scripts/finetune_k8.py`** + **`scripts/dpo_k8.py`** — default `--data` paths updated from `dataset/pilot_500/processed/` to `dataset/tier_1/processed/`.
+
+**Doc currency fixes:**
+
+10. **`HANDOFF_TO_EARLIER_CLAUDE.md`** — added "STATUS: HISTORICAL / PARTIALLY SUPERSEDED" banner at top. Pilot-resumption recovery path obsolete (pilot was discarded). Pipeline divergences (DPO data shape, push-public, mmproj filter) still relevant. Pointer to current state via BOOTSTRAP_SEQUENCE.md.
+
+11. **`dataset/tier_1/generation_plan.md`** — updated from "🟡 To generate via Anthropic API" placeholders to actual current state: 522/596 done (87.6%) including A:110, B:60, C:65, D:65, E:35, F-domain 125 new on top of 48 seeds = 173 total. Remaining: V-domain 16 + DPO text 55 + DPO vision 5 = 76 traces.
+
+12. **`CLAUDE.md`** — Section 0 updated to reference BOOTSTRAP_SEQUENCE.md as canonical entry point + bootstrap_check.py as mechanical verifier. Section 0 file list expanded from 7 to 8 (added K8_EXEMPLARS.jsonl as the 8th canonical file).
+
+13. **Project memory** (`~/.claude/projects/.../project_katherine_k8_finetune.md`) + **`MEMORY.md`** index entry — updated to point at BOOTSTRAP_SEQUENCE.md as the cold-start entry, with mechanical-verifier note.
+
+**Operator-pending (left flagged in MAINTENANCE_LOG.md, requires operator decision):**
+
+- `trace_generation_prompt.md` uses `_cat: A6-TWOIS / B5-TWOIS / C8-TWOIS / E1-TWOIS` (suffix style) and `_type: single`. K8_EXEMPLARS.jsonl uses `_cat: A6 / B5 / C8 / E1` with `_type: twois` (separate field). Validator and audit scripts were built around the exemplar schema (separate `_type` field). For schema consistency at T2 generation, either: (a) update trace_generation_prompt.md to match exemplars, or (b) update exemplars + validator + audit to match trace_generation_prompt.md. Operator decision required.
+
+- Vision schema divergence: existing V-domain seeds and V-corpus use HuggingFace multimodal list format (`content: [{"type": "image"}, {"type": "text"}]`). K8_EXEMPLARS.jsonl V-domain entries use Option-1 text-placeholder format (`[image: <desc>] thoughts`). Both work for different generation stages but need reconciliation before T2500+ when real images get substituted. Operator decision required.
+
+- DPO corpus generation (60 pairs at T1) + V-domain text-placeholder generation (16 traces at T1). Not blocking maintenance; queued for next generation pass.
+
+**Rollback:** all touched files backed up to `backups/maintenance-2026-05-10/*.bak` (9 files). `cp backups/maintenance-2026-05-10/<file>.bak <file>` restores any individual file. See `MAINTENANCE_LOG.md` for per-file rollback instructions.

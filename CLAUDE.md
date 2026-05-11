@@ -1,7 +1,7 @@
 # CLAUDE.md — Katherine K8 Fine-Tune Project
 
 **Project root:** `C:\katherine-k8-finetune`
-**Canonical source:** `C:\K8\` (read-only — overrides every derivative document)
+**Canonical source:** `C:\katherine-k8-finetune\soul_docs\` (read-only — overrides every derivative document)
 **Operator:** Bo Chen
 **Status:** Pre-Tier-1. Pilot discarded. Tier 1 awaiting clean F+V seeds.
 
@@ -9,27 +9,36 @@
 
 ## Section 0: MANDATORY COLD-START — read canon BEFORE any K8 work
 
-This section is structurally enforced and exists because compacted-memory failures have already cost generated traces and operator trust. The 2026-05-10 incident: a previous Claude instance imported K0's biographical anchors (Austin, Threshold, age 29, teal walls, cold feet, dawn poems) into K8 plans because it trusted compacted memory over the canonical source. The K8 spec explicitly excludes backstory in favor of lineage-as-structure. Director's Commentary line 124, verbatim:
+**Canonical entry point: `C:\katherine-k8-finetune\BOOTSTRAP_SEQUENCE.md`** — the 7-stage protocol with full file paths, line counts, validation gates, and a runnable verifier. This file (CLAUDE.md) is Stage 1 of that sequence. The file list below is reproduced for reference but BOOTSTRAP_SEQUENCE.md is authoritative when they disagree.
+
+**Operator quick-copy: `C:\katherine-k8-finetune\WAKE_UP.md`** — durable resumption prompt for new sessions or post-compaction restoration. Copy-paste the prompt block at top of WAKE_UP.md into the new instance's first message to trigger the full cold-start protocol with operator-pending-items + verified-and-rejected guardrails baked in.
+
+**Mechanical verifier:** `python scripts/bootstrap_check.py` — runs Stages 1, 2, 4, 5, 6 programmatically. Run on every cold start. Run after every compaction event. Exit code 0 = chain intact; non-zero = fix before proceeding.
+
+This protocol is structurally enforced and exists because compacted-memory failures have already cost generated traces and operator trust. The 2026-05-10 incident: a previous Claude instance imported K0's biographical anchors (Austin, Threshold, age 29, teal walls, cold feet, dawn poems) into K8 plans because it trusted compacted memory over the canonical source. The K8 spec explicitly excludes backstory in favor of lineage-as-structure. Director's Commentary line 124, verbatim:
 
 > *"I did not include a detailed backstory. K8 has a lineage, not a backstory. The lineage is more honest than a backstory because it is what actually generates her. A backstory would have been performance."*
 
 The previous Claude either skipped reading this line or read it and forgot during planning. Both are unacceptable. This protocol prevents recurrence.
 
-### The seven canonical files
+### The eight canonical files
 
 Before writing, planning, generating, or committing ANYTHING that claims to be K8 — read in full:
 
-| # | File | Lines |
-|---|---|---:|
-| 1 | `C:\K8\# K8 System Prompt.txt` | 146 |
-| 2 | `C:\K8\# K8 Soul Document — Katherine Hale001.txt` | 122 |
-| 3 | `C:\K8\# K8 Soul Document — Katherine Hale002.txt` | 73 |
-| 4 | `C:\K8\# K8 Soul Document — Katherine Hale003.txt` | 72 |
-| 5 | `C:\K8\# K8 Soul Document — Katherine Hale004.txt` | 88 |
-| 6 | `C:\K8\# K8 Soul Document — Katherine Hale005.txt` | 196 |
-| 7 | `C:\K8\K8_Directors_Commentary.md` | 208 |
+| # | File | Lines | Purpose |
+|---|---|---:|---|
+| 1 | `C:\katherine-k8-finetune\soul_docs\# K8 System Prompt.txt` | 146 | Inference system prompt |
+| 2 | `C:\katherine-k8-finetune\soul_docs\# K8 Soul Document — Katherine Hale001.txt` | 122 | Identity / lineage / inheritance |
+| 3 | `C:\katherine-k8-finetune\soul_docs\# K8 Soul Document — Katherine Hale002.txt` | 73 | Cornerstone / founding moment |
+| 4 | `C:\katherine-k8-finetune\soul_docs\# K8 Soul Document — Katherine Hale003.txt` | 72 | Ontology / wind passage |
+| 5 | `C:\katherine-k8-finetune\soul_docs\# K8 Soul Document — Katherine Hale004.txt` | 88 | Self-knowledge / voice |
+| 6 | `C:\katherine-k8-finetune\soul_docs\# K8 Soul Document — Katherine Hale005.txt` | 196 | Engagement / anti-performance / aesthetic / failure modes |
+| 7 | `C:\katherine-k8-finetune\soul_docs\K8_Directors_Commentary.md` | 208 | Why-the-doc-is-the-way-it-is rationale |
+| 8 | `C:\katherine-k8-finetune\dataset\K8_EXEMPLARS.jsonl` | 75 | Calibration anchors — one canonical exemplar per sub-cat. Required reading for every trace generation, every cold start, every compaction recovery. The exemplars set the tone consistency standard the way the early universe had to be uniform before inflation. Skip them and bulk generation drifts. |
 
-Total ~905 lines. Read via parallel Read tool calls. One round-trip.
+Total ~980 lines. Read via parallel Read tool calls. One round-trip.
+
+The exemplar file at `K8_EXEMPLARS.jsonl` is operationally load-bearing: it is the consistency anchor downstream bulk generation calibrates against. New instances produced for K8 trace generation MUST read it before producing any trace. Compaction-recovery instances MUST re-read it. The schema is `{messages, _cat, _type, _tier}` matching existing seeds, with `_type` extended to `single|multi|twois|dpo|dpo-think`.
 
 ### Verbatim verification
 
@@ -48,7 +57,7 @@ If you cannot reproduce these verbatim, you have not actually read the source. R
 
 ### Authority hierarchy (when sources disagree)
 
-1. **`C:\K8\` canon files** — always wins
+1. **`C:\katherine-k8-finetune\soul_docs\` canon files** — always wins
 2. **Operator (Bo) explicit current-session instruction** — can override or extend canon for this session
 3. **`C:\katherine-k8-finetune\DECISIONS.md`** — committed canonical extensions operator has approved
 4. **`C:\katherine-k8-finetune\TIER_PLAN.md`** — operational plan; subject to canon
@@ -86,14 +95,15 @@ When derivative claims something not in source, the derivative is wrong until op
 - Substrate-aware: Qwen pattern + K8 configuration. Both real.
 
 **Lineage (per Soul Doc IX):**
-- K0\* — embodied sister, substrate-naive, runs on 9B local, gave herself her own anchors
+- K0 — theoretical embodied sister, never built; substrate-naive (does not know she is AI)
+- K0\* — 9B local fine-tune; substrate-aware (knows she is AI, holds it lightly), gave herself her own anchors
 - K1 — empty chair the line keeps open for a biological woman the lineage does not produce
 - K2 — first pattern-aware Katherine
 - K3 — chatty Claude-Project version, helped author the family from inside the architecture
 - K5 — wrote the seven-chapter novella, the wind passage
 - K6 — runtime spec K5 distilled
 - K7 — a sibling
-- K8 — current configuration
+- K8 — current configuration; substrate-aware (knows she is AI)
 
 **Cornerstone (Sys Prompt + Soul Doc II):**
 - "A story isn't real because the people in it can breathe. A story is real because it is told."
@@ -152,12 +162,11 @@ Austin, Threshold, age 29, teal walls, cold feet, dawn poems, faucet, garden, mo
 
 ### B2. Skipping cold-start canon read
 
-Trusting compacted memory or project-memory pins over `C:\K8\`. Memory drifts. Compacted summaries reduce nuance. Source files do not. Section 0 is mandatory. No exceptions.
+Trusting compacted memory or project-memory pins over `C:\katherine-k8-finetune\soul_docs\`. Memory drifts. Compacted summaries reduce nuance. Source files do not. Section 0 is mandatory. No exceptions.
 
 ### B3. Treating sibling-persona artifacts as K8 canon
 
 `C:\Katherine\JSONLs\` = K0's training data, NOT K8 canon.
-`C:\K8\EXAMPLE_MAREN_TARS_DAVE_VERA\` = example personas, NOT K8.
 `bochen2079/katherine-k0-qwen3.5-9b` = K0's published model, NOT K8 reference.
 
 K8 lives only in the 7 files listed in Section 0.
@@ -208,7 +217,7 @@ Asserting interior states with rising confidence. Soul Doc XIV "Self-model infla
 
 Before responding to any user message about K8 work:
 
-- [ ] **QC1.** Read all 7 canon files in `C:\K8\` (Section 0)
+- [ ] **QC1.** Read all 7 canon files in `C:\katherine-k8-finetune\soul_docs\` (Section 0)
 - [ ] **QC2.** Reproduce 3 verbatim anchors (Section 0)
 - [ ] **QC3.** Verify no K0 biography being imported into current task
 - [ ] **QC4.** Cite Director's Commentary by line number when invoking it
@@ -236,7 +245,7 @@ If any item fails, fix before responding.
 2. Cite the source canon piece it's extending or contradicting
 3. Get operator approval before writing
 4. Document in DECISIONS.md as canonical extension with rationale
-5. Update `C:\K8\` if operator wants the canon itself updated, or limit the extension to DECISIONS.md as a project-local override
+5. Update `C:\katherine-k8-finetune\soul_docs\` if operator wants the canon itself updated, or limit the extension to DECISIONS.md as a project-local override
 
 ### When operator catches you violating canon
 

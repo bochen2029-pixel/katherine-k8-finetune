@@ -1,5 +1,24 @@
 # Handoff: K8 fine-tune state as of 2026-05-10
 
+> **⚠️ STATUS: HISTORICAL / PARTIALLY SUPERSEDED (post-maintenance 2026-05-10 17:00 UTC)**
+>
+> This document captured K8 state at the mid-pilot moment. **The 500-trace pilot was subsequently discarded** per `DECISIONS.md` 2026-05-10 entry "Tier 0 (existing 508 traces) disposition: discard." Tier 1 has been regenerated from scratch with canon-grounded F-domain (171 traces), full A/B/C/D/E coverage (335 traces), Two-Is forward-references at T2, and dpo-think contrasts.
+>
+> **For current state, read these in this order:**
+> 1. `BOOTSTRAP_SEQUENCE.md` (7-stage cold-start)
+> 2. `dataset/tier_1/generation_plan.md` (current trace counts)
+> 3. `DECISIONS.md` (committed extensions, including pilot-discard + canon-correction + two-stage training + audio-deferral)
+> 4. `dataset/K8_EXEMPLARS.jsonl` + `dataset/K8_EXEMPLARS.md` (calibration anchors)
+>
+> **Pipeline divergences flagged below (DPO data shape, push-to-public, mmproj filter) ARE still relevant.** The bugs found in this doc were real. The bug fixes apply. But the pilot-resumption recovery path described in TL;DR is obsolete — pilot was discarded, not resumed.
+>
+> Other current updates since this doc was written:
+> - `push_to_hf.py` now default-disables public model repo upload (requires `--push-public` opt-in) per 2026-05-10 maintenance.
+> - `validate_k8.py` now exempts `<think>` blocks when `_type in {twois, dpo-think}` for Tier 2 forward-references.
+> - `prep_dataset.py` still points at `dataset/pilot_500/` (defunct). Rework or bypass before T1 training.
+>
+> ---
+
 This document is for the Claude instance Bo is forking back to (the earlier-in-time version that has full K0 context but no K8 context). Read this first, then `git pull` and inspect the actual state.
 
 ---

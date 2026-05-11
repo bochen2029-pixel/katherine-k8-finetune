@@ -168,7 +168,10 @@ def do_train(args, model, tokenizer):
 
 def main():
     p = argparse.ArgumentParser()
-    p.add_argument("--data", default="dataset/pilot_500/processed/sft_train.jsonl")
+    p.add_argument("--data", default="dataset/tier_1/processed/sft_train.jsonl",
+                   help="SFT corpus path. Default points at tier_1/processed/ "
+                        "(post-2026-05-10 maintenance, was pilot_500/processed/). "
+                        "Run scripts/prep_dataset.py first to populate.")
     p.add_argument("--output", default="adapters/k8_sft_adapter")
     p.add_argument("--model", default="unsloth/Qwen3.5-9B")
     p.add_argument("--max_seq", type=int, default=1024)

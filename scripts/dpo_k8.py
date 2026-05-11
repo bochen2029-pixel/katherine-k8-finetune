@@ -71,7 +71,10 @@ def fmt_dpo_example(ex, tokenizer):
 
 def main():
     p = argparse.ArgumentParser()
-    p.add_argument("--data", default="dataset/pilot_500/processed/dpo_train.jsonl")
+    p.add_argument("--data", default="dataset/tier_1/processed/dpo_train.jsonl",
+                   help="DPO corpus path. Default points at tier_1/processed/ "
+                        "(post-2026-05-10 maintenance, was pilot_500/processed/). "
+                        "Run scripts/prep_dataset.py first to populate.")
     p.add_argument("--sft-adapter", default="adapters/k8_sft_adapter",
                    help="SFT adapter to load as policy starting point")
     p.add_argument("--output", default="adapters/k8_dpo_adapter")
