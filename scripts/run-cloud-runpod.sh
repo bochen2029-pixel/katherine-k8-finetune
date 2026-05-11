@@ -5,6 +5,13 @@
 # watchdog supervisor; pilot is short enough that crash recovery overhead
 # costs more than crashes do at this scale).
 #
+# TEXT-ONLY DEFAULTS (2026-05-11): paths point at the Stage 1a text-only outputs
+# from prep_dataset.py --stage 1a (sft_train_text.jsonl / dpo_train_text.jsonl).
+# Audio + Vision pipelines are not in this orchestrator. mmproj is still produced
+# as a byproduct of GGUF export to preserve Qwen3.5-9B's native vision tower; that
+# is base-model integrity, not vision training. Override DATA_SFT/DATA_DPO env
+# vars to point at different data if you want to train on something else.
+#
 # Stage skip: SKIP_SFT=1 SKIP_DPO=1 SKIP_GGUF=1 SKIP_PUSH=1
 # Hyperparameter override: SFT_BATCH=8 SFT_GRAD_ACCUM=4 etc.
 
@@ -12,8 +19,8 @@ set -uo pipefail
 cd "$(dirname "$0")/.."
 
 BASE_MODEL="${BASE_MODEL:-unsloth/Qwen3.5-9B}"
-DATA_SFT="${DATA_SFT:-dataset/pilot_500/processed/sft_train.jsonl}"
-DATA_DPO="${DATA_DPO:-dataset/pilot_500/processed/dpo_train.jsonl}"
+DATA_SFT="${DATA_SFT:-dataset/tier_1/processed/sft_train_text.jsonl}"
+DATA_DPO="${DATA_DPO:-dataset/tier_1/processed/dpo_train_text.jsonl}"
 
 SFT_ADAPTER="${SFT_ADAPTER:-adapters/k8_sft_adapter}"
 DPO_ADAPTER="${DPO_ADAPTER:-adapters/k8_dpo_adapter}"
